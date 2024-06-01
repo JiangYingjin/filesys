@@ -491,10 +491,7 @@ public:
     // 确保文件大小不超过最大值才执行以下函数
     void _set_block_list(INode &inode, vector<short> &block_id_list)
     {
-        // 清空原有数据并释放原地址块
-        for (const auto &block_id : _get_block_list(inode))
-            _clear_block(block_id);
-
+        // 清空 INode 地址
         inode.clear_address();
 
         // 将 block_id_list 分成直接块、间接块、双重间接块三个部分
@@ -900,6 +897,8 @@ public:
             cout << "[新增目录项] 新增 Dentry 数据块：" << new_block_id << endl;
             _create_blank_dentries(new_block_id);
             block_id_list.push_back(new_block_id);
+            // 设计更高效的算法
+            // TODO
             _set_block_list(dir_inode, block_id_list);
             cout << "[新增目录项] 新增 Dentry 数据块后的 INode 信息：" << endl;
             cout << dir_inode << endl;
@@ -1711,22 +1710,22 @@ int main(int argc, char *argv[])
     // printf("数据块数量: %d\n", DATA_BLOCK_NUM);
     FileSystem fs;
 
-    fs.create_file("/root/abc", 600);
-    fs.create_file("/root/.abc", 600);
-    fs.create_file("/abc", 600);
-    fs.create_file("/.abc", 600);
+    // fs.create_file("/root/abc", 600);
+    // fs.create_file("/root/.abc", 600);
+    // fs.create_file("/abc", 600);
+    // fs.create_file("/.abc", 600);
 
-    // 路径解析测试
-    vector<string> _path_test_set = {"abc", ".abc", "/.abc", "./.abc", "./.abc/.def", "../.abc/.def"};
-    fs.working_dir = "/root";
-    for (const auto &path : _path_test_set)
-        fs._split_path(path);
-    fs.working_dir = "/";
-    for (const auto &path : _path_test_set)
-        fs._split_path(path);
+    // // 路径解析测试
+    // vector<string> _path_test_set = {"abc", ".abc", "/.abc", "./.abc", "./.abc/.def", "../.abc/.def"};
+    // fs.working_dir = "/root";
+    // for (const auto &path : _path_test_set)
+    //     fs._split_path(path);
+    // fs.working_dir = "/";
+    // for (const auto &path : _path_test_set)
+    //     fs._split_path(path);
 
     // 新增目录项测试
-    for (int i = 10; i < 8180; i++)
+    for (int i = 1; i < 8180; i++)
     {
         fs.create_file("/f" + to_string(i), 1);
     }
