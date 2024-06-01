@@ -10,14 +10,9 @@ public:
     template <typename T>
     InfoLogger &operator<<(const T &value)
     {
-        cout << "[INFO] " << value;
-        return *this;
-    }
-
-    ~InfoLogger()
-    {
         if (!PRODUCTION)
-            cout << endl;
+            cout << "[INFO] " << value;
+        return *this;
     }
 };
 
