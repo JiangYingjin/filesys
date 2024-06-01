@@ -51,6 +51,7 @@ sum
 #include <algorithm>
 #include <cstdlib>
 #include <iterator>
+#include <cmath>
 using namespace std;
 
 #define FILESYSTEM_NAME "file.sys"
@@ -175,7 +176,7 @@ public:
     Dentry()
     {
         inode_id = -1;
-        set_filename("");
+        set_filename("unknown");
     }
 
     Dentry(short inode_id, string filename)
@@ -336,41 +337,6 @@ public:
         file.close();
     }
 
-    bool _is_filesys_exist()
-    {
-        ifstream file(FILESYSTEM_NAME);
-        bool exist = file.good();
-        file.close();
-        return exist;
-    }
-
-    // 打印 bitmap
-    void _show_bitmap()
-    {
-        Bitmap *block_bitmap_ = new Bitmap(BLOCK_BITMAP_SIZE);
-        Bitmap *inode_bitmap_ = new Bitmap(INODE_BITMAP_SIZE);
-
-        _load(block_bitmap_->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _load(inode_bitmap_->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
-
-        cout << "Block Bitmap: " << endl;
-        for (int i = 0; i < BLOCK_BITMAP_SIZE; i++)
-            cout << (int)block_bitmap_->bitmap[i];
-        cout << endl;
-
-        cout << "INode Bitmap: " << endl;
-        for (int i = 0; i < INODE_BITMAP_SIZE; i++)
-            cout << (int)inode_bitmap_->bitmap[i];
-        cout << endl;
-    }
-
-    // 保存 bitmap
-    void _save_bitmap()
-    {
-        _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
-    }
-
     // 创建文件系统
     void _create_filesys()
     {
@@ -393,12 +359,46 @@ public:
         _init_root_dir();
     }
 
+    // 初始化根目录
+    void _init_root_dir()
+    {
+        cout << "初始化根目录 ..." << endl;
+
+        // Inode
+        INode &root_inode = inode_table[ROOT_INODE_ID];
+        root_inode.id = ROOT_INODE_ID;
+        root_inode.file_type = 'd';
+        root_inode.file_size = BLOCK_SIZE;
+        root_inode.create_time = Util::get_current_time();
+        root_inode.modify_time = Util::get_current_time();
+        root_inode.link_cnt = 0;
+        root_inode.direct_block[0] = _get_avail_block();
+        cout << root_inode << endl;
+        _dump(&root_inode, INODE_TABLE_START + ROOT_INODE_ID * INODE_SIZE, INODE_SIZE);
+
+        // 数据块
+        _create_blank_dentries(root_inode.direct_block[0]);
+
+        // Bitmap
+        inode_bitmap->set(ROOT_INODE_ID);
+        _save_bitmap();
+        _show_bitmap();
+    }
+
     void _init_working_dir()
     {
         working_dir = "/";
         working_dir_inode_id = ROOT_INODE_ID;
         cout << "working_dir: " << working_dir << endl;
         cout << "working_dir_inode_id: " << working_dir_inode_id << endl;
+    }
+
+    bool _is_filesys_exist()
+    {
+        ifstream file(FILESYSTEM_NAME);
+        bool exist = file.good();
+        file.close();
+        return exist;
     }
 
     // 获取可用块 ID 并在 bitmap 中标记已使用
@@ -433,58 +433,22 @@ public:
         return -1;
     }
 
-    void _delete_inode(short id)
-    {
-        inode_table[id] = INode();
-        _dump(&inode_table[id], INODE_TABLE_START + id * INODE_SIZE, INODE_SIZE);
-        inode_bitmap->set(id, 0);
-        _save_bitmap();
-    }
-
-    void _delete_block(short id)
-    {
-        char *block = new char[BLOCK_SIZE];
-        memset(block, 0, BLOCK_SIZE);
-        _dump(block, BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
-        delete[] block;
-
-        block_bitmap->set(id, 0);
-        _save_bitmap();
-    }
-
-    // 初始化根目录
-    void _init_root_dir()
-    {
-        cout << "初始化根目录 ..." << endl;
-
-        // Inode
-        INode &root_inode = inode_table[ROOT_INODE_ID];
-        root_inode.id = ROOT_INODE_ID;
-        root_inode.file_type = 'd';
-        root_inode.file_size = BLOCK_SIZE;
-        root_inode.create_time = Util::get_current_time();
-        root_inode.modify_time = Util::get_current_time();
-        root_inode.link_cnt = 0;
-        root_inode.direct_block[0] = _get_avail_block();
-        cout << root_inode << endl;
-        _dump(&root_inode, INODE_TABLE_START + ROOT_INODE_ID * INODE_SIZE, INODE_SIZE);
-
-        // 数据块
-        _create_blank_dentries(root_inode.direct_block[0]);
-
-        // Bitmap
-        inode_bitmap->set(ROOT_INODE_ID);
-        _save_bitmap();
-        _show_bitmap();
-    }
-
+    // 目录 d 的数据块
     void _create_blank_dentries(short block_id)
     {
         Dentry *dentry = new Dentry[DENTRY_NUM_PER_BLOCK];
-        for (int i = 0; i < DENTRY_NUM_PER_BLOCK; i++)
-            dentry[i] = Dentry();
+        fill_n(dentry, DENTRY_NUM_PER_BLOCK, Dentry());
         _dump(dentry, BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
         delete[] dentry;
+    }
+
+    // inode 的间接地址数据块
+    void _create_blank_address_block(short block_id)
+    {
+        short *block = new short[ADDRESS_PER_BLOCK];
+        fill_n(block, ADDRESS_PER_BLOCK, -1);
+        _dump(block, BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
+        delete[] block;
     }
 
     // 由块ID向量生成直接块ID、间接块ID、双重间接块ID
@@ -515,83 +479,108 @@ public:
             for (int i = 0; i < _direct_block_list.size(); i++)
             {
                 inode.direct_block[i] = _direct_block_list[i];
-                cout << "inode.direct_block[" << i << "]: " << inode.direct_block[i] << endl;
+                cout << "_set_block_list: inode.direct_block[" << i << "]: " << inode.direct_block[i] << endl;
             }
 
         // 间接块
         if (!_indirect_block_list.empty())
-            for (int i = 0; i < NUM_INDIRECT_BLOCK; i++)
+        {
+            inode.indirect_block[0] = _get_avail_block();
+
+            short *block = new short[ADDRESS_PER_BLOCK];
+            fill_n(block, ADDRESS_PER_BLOCK, -1);
+
+            for (int j = 0; j < _indirect_block_list.size(); j++)
             {
-                inode.indirect_block[i] = _get_avail_block();
-                _create_blank_dentries(inode.indirect_block[i]);
-
-                short *block = new short[ADDRESS_PER_BLOCK];
-                for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
-                    block[j] = _indirect_block_list[i * ADDRESS_PER_BLOCK + j];
-
-                _dump(block, BLOCK_START + inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
-                delete[] block;
+                cout << "_set_block_list: _indirect_block_list[" << j << "]: " << _indirect_block_list[j] << endl;
+                block[j] = _indirect_block_list[j];
             }
+
+            _dump(block, BLOCK_START + inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+            delete[] block;
+        }
 
         // 二级间接块
         if (!_double_indirect_block_list.empty())
-            for (int i = 0; i < NUM_DOUBLE_INDIRECT_BLOCK; i++)
+        {
+            inode.double_indirect_block[0] = _get_avail_block();
+
+            // 将 _double_indirect_block_list 转为二维数组
+            short m = ceil(float(_double_indirect_block_list.size()) / ADDRESS_PER_BLOCK);
+            short n = ADDRESS_PER_BLOCK;
+            short address[m][n]; // 数据块的地址
+            short addresses[n];  // 二级地址块的地址
+            fill_n(addresses, n, -1);
+
+            // 置入值
+            for (int cnt = 0; cnt < _double_indirect_block_list.size(); cnt++)
             {
-                inode.double_indirect_block[i] = _get_avail_block();
-                _create_blank_dentries(inode.double_indirect_block[i]);
+                short i = cnt / ADDRESS_PER_BLOCK;
+                short j = cnt % ADDRESS_PER_BLOCK;
+                address[i][j] = _double_indirect_block_list[cnt];
+                // cout << "_set_block_list: double_indirect_block_list[" << cnt << "]: address[" << i << "][" << j << "]: " << address[i][j] << endl;
+            }
 
+            for (int i = 0; i < m; i++)
+            {
+                addresses[i] = _get_avail_block();
                 short *block = new short[ADDRESS_PER_BLOCK];
-                for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
+                fill_n(block, ADDRESS_PER_BLOCK, -1);
+                for (int j = 0; i * n + j < _double_indirect_block_list.size(); j++)
                 {
-                    block[j] = _get_avail_block();
-                    _create_blank_dentries(block[j]);
-
-                    short *block2 = new short[ADDRESS_PER_BLOCK];
-                    for (int k = 0; k < ADDRESS_PER_BLOCK; k++)
-                        block2[k] = _double_indirect_block_list[i * ADDRESS_PER_BLOCK * ADDRESS_PER_BLOCK + j * ADDRESS_PER_BLOCK + k];
-
-                    _dump(block2, BLOCK_START + block[j] * BLOCK_SIZE, BLOCK_SIZE);
-                    delete[] block2;
+                    block[j] = address[i][j];
+                    cout << "_set_block_list: double_indirect_block_list[" << i * ADDRESS_PER_BLOCK + j << "]: address[" << i << "][" << j << "]: " << block[j] << endl;
                 }
-
-                _dump(block, BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                _dump(block, BLOCK_START + addresses[i] * BLOCK_SIZE, BLOCK_SIZE);
                 delete[] block;
             }
+
+            _dump(addresses, BLOCK_START + inode.double_indirect_block[0] * BLOCK_SIZE, BLOCK_SIZE);
+        }
 
         _dump(&inode, INODE_TABLE_START + inode.id * INODE_SIZE, INODE_SIZE);
     }
 
     // 由 inode 的直接块ID、间接块ID、双重间接块ID获取其块ID向量
     // 返回块 ID 向量，根据这个向量就能获取所有内容
-    vector<short> _get_block_list(INode inode)
+    vector<short> _get_block_list(INode &inode)
     {
         vector<short> block_id_list;
 
         // 直接块
         for (int i = 0; i < NUM_DIRECT_BLOCK; i++)
             if (inode.direct_block[i] != -1)
+            {
+                cout << "_get_block_list: inode.direct_block[i]: " << inode.direct_block[i] << endl;
                 block_id_list.push_back(inode.direct_block[i]);
+            }
 
         // 间接块
         for (int i = 0; i < NUM_INDIRECT_BLOCK; i++)
             if (inode.indirect_block[i] != -1)
             {
+                cout << "_get_block_list: inode.indirect_block[" << i << "]: " << inode.indirect_block[i] << endl;
                 short *block = new short[ADDRESS_PER_BLOCK];
                 _load(block, BLOCK_START + inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
                 for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
                     if (block[j] != -1)
+                    {
+                        cout << "_get_block_list: inode.indirect_block[" << i << "], address[" << j << "]: " << block[j] << endl;
                         block_id_list.push_back(block[j]);
+                    }
             }
 
         // 二级间接块
         for (int i = 0; i < NUM_DOUBLE_INDIRECT_BLOCK; i++)
             if (inode.double_indirect_block[i] != -1)
             {
+                cout << "_get_block_list: inode.double_indirect_block[" << i << "]: " << inode.double_indirect_block[i] << endl;
                 short *block = new short[ADDRESS_PER_BLOCK];
                 _load(block, BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
                 for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
                     if (block[j] != -1)
                     {
+                        cout << "_get_block_list: inode.double_indirect_block[" << i << "], address[" << j << "]: " << block[j] << endl;
                         short *block2 = new short[ADDRESS_PER_BLOCK];
                         _load(block2, BLOCK_START + block[j] * BLOCK_SIZE, BLOCK_SIZE);
                         for (int k = 0; k < ADDRESS_PER_BLOCK; k++)
@@ -603,6 +592,52 @@ public:
             }
 
         return block_id_list;
+    }
+
+    // 打印 bitmap
+    void _show_bitmap()
+    {
+        Bitmap *block_bitmap_ = new Bitmap(BLOCK_BITMAP_SIZE);
+        Bitmap *inode_bitmap_ = new Bitmap(INODE_BITMAP_SIZE);
+
+        _load(block_bitmap_->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _load(inode_bitmap_->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+
+        cout << "Block Bitmap: " << endl;
+        for (int i = 0; i < BLOCK_BITMAP_SIZE; i++)
+            cout << (int)block_bitmap_->bitmap[i];
+        cout << endl;
+
+        cout << "INode Bitmap: " << endl;
+        for (int i = 0; i < INODE_BITMAP_SIZE; i++)
+            cout << (int)inode_bitmap_->bitmap[i];
+        cout << endl;
+    }
+
+    // 保存 bitmap
+    void _save_bitmap()
+    {
+        _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+    }
+
+    void _delete_inode(short id)
+    {
+        inode_table[id] = INode();
+        _dump(&inode_table[id], INODE_TABLE_START + id * INODE_SIZE, INODE_SIZE);
+        inode_bitmap->set(id, 0);
+        _save_bitmap();
+    }
+
+    void _delete_block(short id)
+    {
+        char *block = new char[BLOCK_SIZE];
+        memset(block, 0, BLOCK_SIZE);
+        _dump(block, BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
+        delete[] block;
+
+        block_bitmap->set(id, 0);
+        _save_bitmap();
     }
 
     // 只存放间接地址块，有别于数据块
@@ -871,7 +906,7 @@ public:
         }
     }
 
-        void remove_file(string &path, bool recursive = false)
+    void remove_file(string &path, bool recursive = false)
     {
 
         // 将路径转为绝对路径
@@ -1072,6 +1107,8 @@ public:
     {
         printf("读取文件内容中 ...\n");
         vector<short> block_id_list = _get_block_list(inode);
+        for (int i = 0; i < block_id_list.size(); i++)
+            printf("block_id_list[%d]: %d\n", i, block_id_list[i]);
         char *file_data = new char[inode.file_size];
         for (int i = 0; i < block_id_list.size(); i++)
             _load(file_data + i * BLOCK_SIZE, BLOCK_START + block_id_list[i] * BLOCK_SIZE, BLOCK_SIZE);
@@ -1522,6 +1559,26 @@ public:
     // }
 };
 
+void _read_write_filesys_example_()
+{
+    FileSystem fs;
+
+    // 读入单个
+    Dentry *dentry = new Dentry;
+    fs._load(dentry, BLOCK_START, 32);
+    cout << dentry->inode_id << endl;
+    cout << dentry->filename << endl;
+
+    // 读入数组
+    Dentry *dentry_list = new Dentry[DENTRY_NUM_PER_BLOCK];
+    fs._load(dentry_list, BLOCK_START, BLOCK_SIZE);
+    for (int i = 0; i < DENTRY_NUM_PER_BLOCK; i++)
+    {
+        cout << "dentry[" << i << "].inode_id: " << dentry_list[i].inode_id << endl;
+        cout << "dentry[" << i << "].filename: " << dentry_list[i].filename << endl;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     print_all_macros();
@@ -1550,24 +1607,4 @@ int main(int argc, char *argv[])
     fs.cat("/abc");
 
     return 0;
-}
-
-void _read_write_filesys_example()
-{
-    FileSystem fs;
-
-    // 读入单个
-    Dentry *dentry = new Dentry;
-    fs._load(dentry, BLOCK_START, 32);
-    cout << dentry->inode_id << endl;
-    cout << dentry->filename << endl;
-
-    // 读入数组
-    Dentry *dentry_list = new Dentry[DENTRY_NUM_PER_BLOCK];
-    fs._load(dentry_list, BLOCK_START, BLOCK_SIZE);
-    for (int i = 0; i < DENTRY_NUM_PER_BLOCK; i++)
-    {
-        cout << "dentry[" << i << "].inode_id: " << dentry_list[i].inode_id << endl;
-        cout << "dentry[" << i << "].filename: " << dentry_list[i].filename << endl;
-    }
 }
