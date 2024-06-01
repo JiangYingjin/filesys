@@ -33,9 +33,13 @@ j)打印文件内容：cat
 k)您不需要实现 Login 的功能！
 5.加载和退出：退出程序并释放所有占用的内存，但内存的内容应保存在磁盘上，以便重新加载；
 
-rm rm -r
-touch mkdir
-cd cp cat
+rm
+rm -r
+touch   =
+mkdir
+cd
+cp
+cat
 sum
 */
 
@@ -52,6 +56,9 @@ sum
 #include <cstdlib>
 #include <iterator>
 #include <cmath>
+
+#include "Log.cpp"
+
 using namespace std;
 
 #define FILESYSTEM_NAME "file.sys"
@@ -207,14 +214,14 @@ class INode
 public:
     short id;                                               // INode 编号，占用 2 Byte
     char file_type;                                         // 文件类型，占用 1 Byte
-    short file_size;                                        // 文件大小，占用 2 Byte
+    int file_size;                                          // 文件大小（单位 KB），占用 4 Byte
     int32_t create_time;                                    // 创建时间，占用 4 Byte
     int32_t modify_time;                                    // 修改时间，占用 4 Byte
     short link_cnt;                                         // 链接数，占用 2 Byte
     short direct_block[NUM_DIRECT_BLOCK];                   // 直接地址，占用 20 Byte
     short indirect_block[NUM_INDIRECT_BLOCK];               // 间接地址，占用 2 Byte
     short double_indirect_block[NUM_DOUBLE_INDIRECT_BLOCK]; // 双重间接地址，占用 2 Byte
-                                                            // 总共 39 Byte
+                                                            // 总共 41 Byte
     INode()
     {
         this->id = -1;
@@ -496,46 +503,40 @@ public:
                 block[j] = _indirect_block_list[j];
             }
 
-            _dump(block, BLOCK_START + inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+            _dump(block, BLOCK_START + inode.indirect_block[0] * BLOCK_SIZE, BLOCK_SIZE);
             delete[] block;
         }
 
         // 二级间接块
         if (!_double_indirect_block_list.empty())
         {
+            cout << "_double_indirect_block_list.size(): " << _double_indirect_block_list.size() << endl;
+            cout << "_set_block_list: ceil(float(_double_indirect_block_list.size()) / ADDRESS_PER_BLOCK): " << ceil(float(_double_indirect_block_list.size()) / ADDRESS_PER_BLOCK) << endl;
+
             inode.double_indirect_block[0] = _get_avail_block();
+            short _1st_address_block[ADDRESS_PER_BLOCK]; // 二级地址块的地址
+            fill_n(_1st_address_block, ADDRESS_PER_BLOCK, -1);
 
-            // 将 _double_indirect_block_list 转为二维数组
-            short m = ceil(float(_double_indirect_block_list.size()) / ADDRESS_PER_BLOCK);
-            short n = ADDRESS_PER_BLOCK;
-            short address[m][n]; // 数据块的地址
-            short addresses[n];  // 二级地址块的地址
-            fill_n(addresses, n, -1);
-
-            // 置入值
-            for (int cnt = 0; cnt < _double_indirect_block_list.size(); cnt++)
+            for (int i = 0; i < ceil(float(_double_indirect_block_list.size()) / ADDRESS_PER_BLOCK); i++)
             {
-                short i = cnt / ADDRESS_PER_BLOCK;
-                short j = cnt % ADDRESS_PER_BLOCK;
-                address[i][j] = _double_indirect_block_list[cnt];
-                // cout << "_set_block_list: double_indirect_block_list[" << cnt << "]: address[" << i << "][" << j << "]: " << address[i][j] << endl;
-            }
+                _1st_address_block[i] = _get_avail_block();
+                cout << "_set_block_list: _1st_address_block[" << i << "]: " << _1st_address_block[i] << endl;
 
-            for (int i = 0; i < m; i++)
-            {
-                addresses[i] = _get_avail_block();
                 short *block = new short[ADDRESS_PER_BLOCK];
                 fill_n(block, ADDRESS_PER_BLOCK, -1);
-                for (int j = 0; i * n + j < _double_indirect_block_list.size(); j++)
+                for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
                 {
-                    block[j] = address[i][j];
-                    cout << "_set_block_list: double_indirect_block_list[" << i * ADDRESS_PER_BLOCK + j << "]: address[" << i << "][" << j << "]: " << block[j] << endl;
+                    if (i * ADDRESS_PER_BLOCK + j >= _double_indirect_block_list.size())
+                        break;
+                    block[j] = _double_indirect_block_list[i * ADDRESS_PER_BLOCK + j];
+                    cout << "_set_block_list: _double_indirect_block_list[" << i * ADDRESS_PER_BLOCK + j << "]: " << block[j] << endl;
                 }
-                _dump(block, BLOCK_START + addresses[i] * BLOCK_SIZE, BLOCK_SIZE);
+                for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
+                    cout << "_set_block_list: test_block[" << j << "]: " << block[j] << endl;
+                _dump(block, BLOCK_START + _1st_address_block[i] * BLOCK_SIZE, BLOCK_SIZE);
                 delete[] block;
             }
-
-            _dump(addresses, BLOCK_START + inode.double_indirect_block[0] * BLOCK_SIZE, BLOCK_SIZE);
+            _dump(_1st_address_block, BLOCK_START + inode.double_indirect_block[0] * BLOCK_SIZE, BLOCK_SIZE);
         }
 
         _dump(&inode, INODE_TABLE_START + inode.id * INODE_SIZE, INODE_SIZE);
@@ -670,7 +671,7 @@ public:
         return indirect_block_list;
     }
 
-    string _relative_to_absolute(const string path)
+    string _absolute_path(const string path)
     {
         // 打印 path
         cout << "path: " << path << endl;
@@ -705,7 +706,7 @@ public:
         cout << "path.length(): " << path.length() << endl;
 
         // 将路径转为绝对路径
-        string absolute_path = _relative_to_absolute(path);
+        string absolute_path = _absolute_path(path);
 
         // 打印 absolute_path 及其长度
         cout << "absolute_path: " << absolute_path << endl;
@@ -910,7 +911,7 @@ public:
     {
 
         // 将路径转为绝对路径
-        string absolute_path = _relative_to_absolute(path);
+        string absolute_path = _absolute_path(path);
 
         // 寻找 path 的 inode
         short dir_inode_id, file_inode_id;
@@ -1015,7 +1016,7 @@ public:
     void create_file(const string path, int filesize)
     {
         // 将路径转为绝对路径
-        string absolute_path = _relative_to_absolute(path);
+        string absolute_path = _absolute_path(path);
 
         // 寻找 path 的 inode
         short dir_inode_id, file_inode_id;
@@ -1105,10 +1106,11 @@ public:
 
     char *_load_file(INode inode)
     {
-        printf("读取文件内容中 ...\n");
+        cout << "读取文件内容中 ..." << endl;
+        cout << inode << endl;
         vector<short> block_id_list = _get_block_list(inode);
         for (int i = 0; i < block_id_list.size(); i++)
-            printf("block_id_list[%d]: %d\n", i, block_id_list[i]);
+            cout << "block_id_list[" << i << "]: " << block_id_list[i] << endl;
         char *file_data = new char[inode.file_size];
         for (int i = 0; i < block_id_list.size(); i++)
             _load(file_data + i * BLOCK_SIZE, BLOCK_START + block_id_list[i] * BLOCK_SIZE, BLOCK_SIZE);
@@ -1154,7 +1156,7 @@ public:
     void cat(const string &path)
     {
         // 将路径转为绝对路径
-        string absolute_path = _relative_to_absolute(path);
+        string absolute_path = _absolute_path(path);
 
         // 寻找 path 的 inode
         short dir_inode_id, file_inode_id;
@@ -1187,7 +1189,7 @@ public:
     void create_dir(string &path)
     {
         // 将路径转为绝对路径
-        string absolute_path = _relative_to_absolute(path);
+        string absolute_path = _absolute_path(path);
 
         // 寻找 path 的 inode
         short dir_inode_id, file_inode_id;
@@ -1263,7 +1265,7 @@ public:
     int change_dir(string path)
     {
         // 将路径转为绝对路径
-        string absolute_path = _relative_to_absolute(path);
+        string absolute_path = _absolute_path(path);
 
         // 寻找 path 的 inode
         short dir_inode_id, file_inode_id;
@@ -1315,8 +1317,8 @@ public:
     int cp(string &src, string &dst)
     {
         // 将路径转为绝对路径
-        string absolute_src = _relative_to_absolute(src);
-        string absolute_dst = _relative_to_absolute(dst);
+        string absolute_src = _absolute_path(src);
+        string absolute_dst = _absolute_path(dst);
 
         // 寻找 src 的 inode
         short src_dir_inode_id, src_file_inode_id;
@@ -1581,6 +1583,10 @@ void _read_write_filesys_example_()
 
 int main(int argc, char *argv[])
 {
+
+    info << "hello world" << endl;
+    exit(0);
+
     print_all_macros();
     // // 打印 INode 大小
     // printf("INode size: %d\n", (int)sizeof(INode)); // 48
@@ -1600,11 +1606,11 @@ int main(int argc, char *argv[])
     // string a = "革命尚未成功，同志仍需努力";
     // cout << "sizeof(a): " << sizeof(a) << "  strlen(a): " << strlen(a.c_str()) << "  a.length(): " << a.length() << "  a.size(): " << a.size() << endl;
 
-    fs.create_file("/abc", 100);
+    // fs.create_file("/abc", 15834);
 
     // 打印根目录所有文件
     fs.dir();
-    fs.cat("/abc");
+    // fs.cat("/abc");
 
     return 0;
 }
