@@ -820,7 +820,9 @@ public:
         {
             // 获取当前目录级别的数据块
             // cout << "[查找 Inode] 当前目录级别：" << level << endl;
-            vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
+            // vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
+            vector<Dentry> _dentry_list;
+            _load_dentries(ptr_inode_id, _dentry_list);
 
             // cout << "[查找 Inode] 当前目录项：" << endl;
             // for (const auto &dentry : _dentry_list)
@@ -1000,7 +1002,7 @@ public:
         _add_dentry(dir_inode, new_inode_id, filename);
     }
 
-    vector<Dentry> _load_dentries(INode inode)
+    void _load_dentries(const INode &inode, vector<Dentry> &dentry_list)
     {
         // cout << "[读取目录项] 读取如下 INode 的目录项 ..." << endl;
         cout << inode << endl;
@@ -1008,10 +1010,10 @@ public:
         if (inode.file_type != 'd')
         {
             cout << "[读取目录项] 该 INode 不是目录，读取失败！" << endl;
-            return {};
+            dentry_list.clear();
         }
 
-        vector<Dentry> dentry_list;
+        // vector<Dentry> dentry_list;
         vector<short> block_id_list = _get_block_list(inode);
         // cout << "[读取目录项] 该 INode 对应的 Dentry 数据块个数：" << block_id_list.size() << endl;
 
@@ -1038,22 +1040,27 @@ public:
         //     cout << dentry << endl;
         // cout << "[读取目录项] 读取到的目录项数量：" << dentry_list.size() << endl;
 
-        return dentry_list;
+        // return dentry_list;
     }
 
-    vector<Dentry> _load_dentries(short inode_id)
+    void _load_dentries(const short &inode_id, vector<Dentry> &dentry_list)
     {
-        INode inode = _get_inode(inode_id);
-        return _load_dentries(inode);
+        _load_dentries(_get_inode(inode_id), dentry_list);
     }
 
-    vector<Dentry> _load_dentries(string &path)
-    {
-        short dir_inode_id, file_inode_id;
-        _search_inode(path, dir_inode_id, file_inode_id);
-        INode dir_inode = _get_inode(dir_inode_id);
-        return _load_dentries(dir_inode);
-    }
+    // vector<Dentry> _load_dentries(short inode_id)
+    // {
+    //     INode inode = _get_inode(inode_id);
+    //     return _load_dentries(inode);
+    // }
+
+    // vector<Dentry> _load_dentries(string &path)
+    // {
+    //     short dir_inode_id, file_inode_id;
+    //     _search_inode(path, dir_inode_id, file_inode_id);
+    //     INode dir_inode = _get_inode(dir_inode_id);
+    //     return _load_dentries(dir_inode);
+    // }
 
     INode _get_inode(const short &inode_id)
     {
@@ -1339,7 +1346,9 @@ public:
             }
             else
             {
-                vector<Dentry> dentry_list = _load_dentries(_inode);
+                // vector<Dentry> dentry_list = _load_dentries(_inode);
+                vector<Dentry> dentry_list;
+                _load_dentries(_inode, dentry_list);
                 cout << "[列出目录] 目录 " << absolute_path << " 内容如下：" << endl;
                 for (const auto &dentry : dentry_list)
                 {
@@ -1365,29 +1374,29 @@ public:
         }
     }
 
-    // 递归获取一个目录下的所有 inode id（包括该目录）
-    vector<short> get_all_sub_inode_id(INode inode)
-    {
-        if (inode.file_type != 'd')
-        {
-            // 返回自己的 inode_id
-            return {inode.id};
-        }
+    // // 递归获取一个目录下的所有 inode id（包括该目录）
+    // vector<short> get_all_sub_inode_id(INode inode)
+    // {
+    //     if (inode.file_type != 'd')
+    //     {
+    //         // 返回自己的 inode_id
+    //         return {inode.id};
+    //     }
 
-        else if (inode.file_type == 'd')
-        {
-            vector<short> inode_id_list = {inode.id};
-            vector<Dentry> dentry_list = _load_dentries(inode);
-            for (auto dentry : dentry_list)
-            {
-                short inode_id = dentry.inode_id;
-                INode _inode = _get_inode(inode_id);
-                vector<short> sub_inode_id_list = get_all_sub_inode_id(_inode);
-                inode_id_list.insert(inode_id_list.end(), sub_inode_id_list.begin(), sub_inode_id_list.end());
-            }
-            return inode_id_list;
-        }
-    }
+    //     else if (inode.file_type == 'd')
+    //     {
+    //         vector<short> inode_id_list = {inode.id};
+    //         vector<Dentry> dentry_list = _load_dentries(inode);
+    //         for (auto dentry : dentry_list)
+    //         {
+    //             short inode_id = dentry.inode_id;
+    //             INode _inode = _get_inode(inode_id);
+    //             vector<short> sub_inode_id_list = get_all_sub_inode_id(_inode);
+    //             inode_id_list.insert(inode_id_list.end(), sub_inode_id_list.begin(), sub_inode_id_list.end());
+    //         }
+    //         return inode_id_list;
+    //     }
+    // }
 
     // int delete_dentry(INode inode, string &filename)
     // {
