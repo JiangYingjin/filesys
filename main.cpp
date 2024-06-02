@@ -116,7 +116,11 @@ public:
     {
         time_t t = timestamp;
         struct tm *tm = localtime(&t);
-        return asctime(tm);
+        // 格式化成 2024-01-01 12:00:00 格式
+        char *datetime_str = new char[20];
+        strftime(datetime_str, 20, "%Y-%m-%d %H:%M:%S", tm);
+        return datetime_str;
+        // return asctime(tm);
     }
 
     // 根据文件大小计算需要使用的块数量
@@ -1311,22 +1315,21 @@ public:
                     if (dentry.inode_id != -1)
                     {
                         INode inode = _get_inode(dentry.inode_id);
-                        cout << inode.file_type << " ";
-                        cout << inode.id << " ";
-                        cout << inode.file_size << " ";
-                        cout << inode.create_time << " ";
-                        cout << inode.modify_time << " ";
-                        cout << inode.link_cnt << " ";
+                        cout << setw(4) << inode.id << "  ";
                         if (inode.file_type == 'd')
                             cout << "目录 ";
                         else if (inode.file_type == 'f')
                             cout << "文件 ";
                         else
                             cout << "未知 ";
+                        cout << setw(2) << inode.link_cnt << " ";
+                        cout << inode.file_size << " ";
+                        cout << Util::time_to_string(inode.create_time) << " ";
+                        cout << Util::time_to_string(inode.modify_time) << "  ";
                         cout << dentry.get_filename() << endl;
                     }
                 }
-                cout << endl;
+                cout << "------------------------------------------" << endl;
             }
         }
     }
@@ -1713,13 +1716,6 @@ public:
     //     return 0;
     // }
 
-    // void sum()
-    // {
-    //     printf("文件系统总大小：%d KB\n", superblock->filesystem_size / 1024);
-    //     printf("已用大小：%d KB\n", superblock->used_block_num * BLOCK_SIZE / 1024);
-    //     printf("剩余大小：%d KB\n", superblock->available_block_num * BLOCK_SIZE / 1024);
-    // }
-
     void remove_file(string &path, bool recursive = false)
     {
 
@@ -1827,6 +1823,16 @@ public:
 
     void sum()
     {
+        // // 计算 bitmap 上 1 的总个数
+        // int block_bitmap_sum = 0;
+        // int inode_bitmap_sum = 0;
+        // for (int i = 0; i < DATA_BLOCK_NUM; i++)
+        //     block_bitmap_sum += block_bitmap->get(i);
+        // for (int i = 0; i < INODE_NUM; i++)
+        //     inode_bitmap_sum += inode_bitmap->get(i);
+        // cout << "block_bitmap_sum: " << block_bitmap_sum << " " << 516 + block_bitmap_sum << endl;
+        // cout << "inode_bitmap_sum: " << inode_bitmap_sum << endl;
+
         cout << *superblock;
         FileSystem::_show_macros();
     }
@@ -1962,8 +1968,9 @@ int main(int argc, char *argv[])
     // fs.sum();
 
     // // 新增目录项测试
-    // for (int i = 1; i < 8180; i++)
+    // for (int i = 1; i < 8192; i++)
     //     fs.create_file("/f" + to_string(i), 1);
+    // fs.sum();
 
     // // 文件实际占用块数
     // cout << Util::block_occupation(15890) << endl;
