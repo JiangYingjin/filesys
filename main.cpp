@@ -211,7 +211,7 @@ public:
         strcpy(this->filename, filename.c_str());
     }
 
-    string get_filename()
+    string get_filename() const
     {
         return string(filename);
     }
@@ -685,6 +685,12 @@ public:
     string _absolute_path(const string path)
     {
         cout << "[获取绝对路径] 原始路径：" << path << endl;
+
+        if (path.empty())
+        {
+            cout << "[获取绝对路径] 路径为当前工作目录：" << working_dir << endl;
+            return working_dir;
+        }
 
         // 如果是绝对路径，直接返回
         if (path[0] == '/')
@@ -1266,6 +1272,61 @@ public:
                 cout << "[切换工作目录] 当前工作目录：" << working_dir << " -> " << absolute_path << endl;
                 working_dir = absolute_path;
                 working_dir_inode_id = dir_inode_id;
+            }
+        }
+    }
+
+    void list_dir(string path = "")
+    {
+        short _inode_id, dir_inode_id;
+
+        // 将路径转为绝对路径
+        string absolute_path = _absolute_path(path);
+
+        if (path.empty())
+            _inode_id = working_dir_inode_id;
+        else
+            _search_inode(path, dir_inode_id, _inode_id);
+
+        // 如果 dir_inode_id 为 -1，则说明目录不存在
+        if (_inode_id == -1)
+        {
+            cout << "[列出目录] " << absolute_path << " 不存在" << endl;
+            return;
+        }
+        else
+        {
+            INode _inode = _get_inode(_inode_id);
+            if (_inode.file_type != 'd')
+            {
+                cout << "[列出目录] " << absolute_path << " 不是目录" << endl;
+                return;
+            }
+            else
+            {
+                vector<Dentry> dentry_list = _load_dentries(_inode);
+                cout << "[列出目录] 目录 " << absolute_path << " 内容如下：" << endl;
+                for (const auto &dentry : dentry_list)
+                {
+                    if (dentry.inode_id != -1)
+                    {
+                        INode inode = _get_inode(dentry.inode_id);
+                        cout << inode.file_type << " ";
+                        cout << inode.id << " ";
+                        cout << inode.file_size << " ";
+                        cout << inode.create_time << " ";
+                        cout << inode.modify_time << " ";
+                        cout << inode.link_cnt << " ";
+                        if (inode.file_type == 'd')
+                            cout << "目录 ";
+                        else if (inode.file_type == 'f')
+                            cout << "文件 ";
+                        else
+                            cout << "未知 ";
+                        cout << dentry.get_filename() << endl;
+                    }
+                }
+                cout << endl;
             }
         }
     }
@@ -1891,9 +1952,14 @@ int main(int argc, char *argv[])
     // for (const auto &path : _path_test_set)
     //     fs._split_path(path);
 
-    // 单文件最大大小测试
-    fs.create_file("/abc", 15835);
-    fs.sum();
+    // // 单文件最大大小测试
+    // fs.create_file("/abc", 15835);
+    // fs.sum();
+
+    // // 小文件数量测试
+    // for (int i = 1; i < 8192; i++)
+    //     fs.create_file("/f" + to_string(i), 1);
+    // fs.sum();
 
     // // 新增目录项测试
     // for (int i = 1; i < 8180; i++)
@@ -1901,6 +1967,11 @@ int main(int argc, char *argv[])
 
     // // 文件实际占用块数
     // cout << Util::block_occupation(15890) << endl;
+
+    // 列出目录测试
+    for (int i = 1; i <= 10; i++)
+        fs.create_file("/f" + to_string(i), 1);
+    fs.list_dir();
 
     // // 打印 block_bitmap 的大小
     // printf("Block bitmap size: %d\n", BLOCK_BITMAP_SIZE); // 2048
