@@ -409,7 +409,7 @@ public:
 
         // Bitmap
         inode_bitmap->set(ROOT_INODE_ID);
-        _save_bitmap();
+        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
         _show_bitmap();
     }
 
@@ -467,6 +467,34 @@ public:
 
         cout << "[可用 INode 申请] 无可用 INode" << endl;
         return -1;
+    }
+
+    void _clear_block(short id)
+    {
+        // char *block = new char[BLOCK_SIZE];
+        // memset(block, 0, BLOCK_SIZE);
+        // _dump(block, BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
+        // delete[] block;
+
+        // Bitmap
+        block_bitmap->set(id, 0);
+        _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        // Superblock
+        superblock->available_block_num++;
+        _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+    }
+
+    void _clear_inode(short id)
+    {
+        // INode _blank_inode = INode();
+        // _dump(&_blank_inode, INODE_TABLE_START + id * INODE_SIZE, INODE_SIZE);
+
+        // Bitmap
+        inode_bitmap->set(id, 0);
+        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        // Superblock
+        superblock->available_inode_num++;
+        _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
     }
 
     // 目录 d 的数据块
@@ -819,25 +847,6 @@ public:
         cout << "[查找 Inode] file_inode_id: " << file_inode_id << endl;
     }
 
-    void _clear_block(short id)
-    {
-        // char *block = new char[BLOCK_SIZE];
-        // memset(block, 0, BLOCK_SIZE);
-        // _dump(block, BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
-        // delete[] block;
-
-        block_bitmap->set(id, 0);
-        _save_bitmap();
-    }
-
-    void _delete_inode(short id)
-    {
-        INode _blank_inode = INode();
-        _dump(&_blank_inode, INODE_TABLE_START + id * INODE_SIZE, INODE_SIZE);
-        inode_bitmap->set(id, 0);
-        _save_bitmap();
-    }
-
     string _filename(const string path)
     {
         vector<string> dir_vector = _split_path(path);
@@ -875,6 +884,7 @@ public:
 
             for (int i = 0; i < DENTRY_NUM_PER_BLOCK; i++)
             {
+                // cout << "[新增目录项] Dentry 数据块 " << block_id << " 的第 " << i << " 个 Dentry：" << dentry[i].inode_id << "  " << dentry[i].get_filename() << endl;
                 if (dentry[i].inode_id == -1)
                 {
                     found = true;
@@ -893,17 +903,58 @@ public:
         if (!found)
         {
             cout << "[新增目录项] 该 INode 目前没有空闲的 Dentry 位置，新增 Dentry 块中 ..." << endl;
-            short new_block_id = _get_avail_block();
-            cout << "[新增目录项] 新增 Dentry 数据块：" << new_block_id << endl;
-            _create_blank_dentries(new_block_id);
-            block_id_list.push_back(new_block_id);
-            // 设计更高效的算法
-            // TODO
-            _set_block_list(dir_inode, block_id_list);
-            cout << "[新增目录项] 新增 Dentry 数据块后的 INode 信息：" << endl;
-            cout << dir_inode << endl;
-            cout << "[新增目录项] 重新尝试新增目录项 ..." << endl;
-            _add_dentry(dir_inode, new_inode_id, filename);
+            // 遍历 INode 的直接块
+            for (int i = 0; i < NUM_DIRECT_BLOCK; i++)
+            {
+                if (dir_inode.direct_block[i] == -1)
+                {
+                    dir_inode.direct_block[i] = _get_avail_block();
+                    _create_blank_dentries(dir_inode.direct_block[i]);
+                    cout << "[新增目录项] 直接块 " << i << " 为空，新增 Dentry 数据块：" << dir_inode.direct_block[i] << endl;
+                    _dump(&dir_inode, INODE_TABLE_START + dir_inode.id * INODE_SIZE, INODE_SIZE);
+                    _add_dentry(dir_inode, new_inode_id, filename);
+                    return;
+                }
+            }
+            // 遍历 INode 的间接块
+            for (int i = 0; i < NUM_INDIRECT_BLOCK; i++)
+            {
+                if (dir_inode.indirect_block[i] == -1)
+                {
+                    dir_inode.indirect_block[i] = _get_avail_block();
+                    cout << "[新增目录项] 间接块 " << i << " 为空，新增 Address 数据块：" << dir_inode.indirect_block[i] << endl;
+                    short *block = new short[ADDRESS_PER_BLOCK];
+                    fill_n(block, ADDRESS_PER_BLOCK, -1);
+                    block[0] = _get_avail_block();
+                    _create_blank_dentries(block[0]);
+                    cout << "[新增目录项] 间接块 " << i << " 的第 0 个地址为空，新增 Dentry 数据块：" << block[0] << endl;
+                    _dump(block, BLOCK_START + dir_inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                    _save_inode(&dir_inode);
+                    delete[] block;
+                    _add_dentry(dir_inode, new_inode_id, filename);
+                    return;
+                }
+                else
+                {
+                    cout << "[新增目录项] 间接块 " << i << " 不为空，读取 Address 数据块：" << dir_inode.indirect_block[i] << endl;
+                    short *block = new short[ADDRESS_PER_BLOCK];
+                    _load(block, BLOCK_START + dir_inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                    for (int j = 0; j < ADDRESS_PER_BLOCK; j++)
+                    {
+                        if (block[j] == -1)
+                        {
+                            block[j] = _get_avail_block();
+                            _create_blank_dentries(block[j]);
+                            cout << "[新增目录项] 间接块 " << i << " 的第 " << j << " 个地址为空，新增 Dentry 数据块：" << block[j] << endl;
+                            _dump(block, BLOCK_START + dir_inode.indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                            _save_inode(&dir_inode);
+                            delete[] block;
+                            _add_dentry(dir_inode, new_inode_id, filename);
+                            return;
+                        }
+                    }
+                }
+            }
         }
     };
 
@@ -978,135 +1029,6 @@ public:
     void _save_inode(INode *inode)
     {
         _dump(inode, INODE_TABLE_START + inode->id * INODE_SIZE, INODE_SIZE);
-    }
-
-    // 递归获取一个目录下的所有 inode id（包括该目录）
-    vector<short> get_all_sub_inode_id(INode inode)
-    {
-        if (inode.file_type != 'd')
-        {
-            // 返回自己的 inode_id
-            return {inode.id};
-        }
-
-        else if (inode.file_type == 'd')
-        {
-            vector<short> inode_id_list = {inode.id};
-            vector<Dentry> dentry_list = _load_dentries(inode);
-            for (auto dentry : dentry_list)
-            {
-                short inode_id = dentry.inode_id;
-                INode _inode = _get_inode(inode_id);
-                vector<short> sub_inode_id_list = get_all_sub_inode_id(_inode);
-                inode_id_list.insert(inode_id_list.end(), sub_inode_id_list.begin(), sub_inode_id_list.end());
-            }
-            return inode_id_list;
-        }
-    }
-
-    void remove_file(string &path, bool recursive = false)
-    {
-
-        // 将路径转为绝对路径
-        string absolute_path = _absolute_path(path);
-
-        // 寻找 path 的 inode
-        short dir_inode_id, file_inode_id;
-        _search_inode(path, dir_inode_id, file_inode_id);
-
-        // 如果 file_inode_id 为 -1，则说明文件不存在
-        if (file_inode_id == -1)
-        {
-            cout << "文件 " << absolute_path << " 不存在" << endl;
-            return;
-        }
-
-        // 获取目录和文件的 inode
-        INode dir_inode = _get_inode(dir_inode_id);
-        INode file_inode = _get_inode(file_inode_id);
-
-        // 如果是目录，recursive 为 false，则不允许删除
-        if (file_inode.file_type == 'd' && !recursive)
-        {
-            cout << "文件 " << absolute_path << " 是目录，不允许删除" << endl;
-            return;
-        }
-
-        // 如果是文件
-        if (file_inode.file_type == 'f')
-        {
-            vector<string> path_vector = _split_path(path);
-            string filename = path_vector.back();
-
-            // 删除所有数据块
-            vector<short> block_id_list = _get_block_list(file_inode);
-            for (auto id : block_id_list)
-            {
-                _clear_block(id);
-            }
-
-            // 删除所有间接地址块
-            // vector<short> *indirect_block_list = _get_addr_block_list(file_inode);
-            for (auto id : _get_addr_block_list(file_inode))
-            {
-                _clear_block(id);
-            }
-
-            // 删除目录项
-            delete_dentry(dir_inode, filename);
-            cout << "文件 " << path << " 删除成功" << endl;
-
-            // 删除文件 inode
-            _delete_inode(file_inode_id);
-        }
-
-        // // 如果是目录，并且 recursive 为 true
-        // if (file_inode.file_type == 'd' && recursive)
-        // {
-        //     // 获取目录下所有 inode_id
-        //     vector<short> inode_id_list = get_all_sub_inode_id(file_inode);
-        //     // 逐个删除
-        //     for (auto id : inode_id_list)
-        //     {
-        //         INode inode = inode_table[id];
-        //         if (inode.file_type == 'f')
-        //         {
-        //             // 删除所有数据块
-        //             vector<short> block_id_list = _get_block_list(inode);
-        //             for (auto id : block_id_list)
-        //             {
-        //                 _clear_block(id);
-        //             }
-
-        //             // 删除所有间接地址块
-        //             vector<short> *indirect_block_list = _get_addr_block_list(inode);
-        //             for (auto id : *indirect_block_list)
-        //             {
-        //                 _clear_block(id);
-        //             }
-
-        //             // 删除目录项
-        //             delete_dentry(dir_inode, filename);
-        //             printf("文件 %s 删除成功\n", path);
-
-        //             // 删除文件 inode
-        //             _delete_inode(id);
-        //         }
-        //     }
-        //     for (auto id : inode_id_list)
-        //     {
-        //         INode inode = inode_table[id];
-        //         if (inode.file_type == 'd')
-        //         {
-        //             // 删除目录项
-        //             delete_dentry(dir_inode, filename);
-        //             printf("目录 %s 删除成功\n", path);
-
-        //             // 删除目录 inode
-        //             _delete_inode(id);
-        //         }
-        //     }
-        // }
     }
 
     // 传入文件路径和文件大小（KB），创建文件
@@ -1187,10 +1109,96 @@ public:
         // 保存 Inode
         _save_inode(new_inode);
 
-        // 保存 bitmap
-        _save_bitmap();
+        cout << "[创建文件] 文件 " << absolute_path << " 创建成功" << endl;
+    }
 
-        cout << "文件 " << absolute_path << " 创建成功" << endl;
+    void create_dir(const string path)
+    {
+        // 将路径转为绝对路径
+        string absolute_path = _absolute_path(path);
+
+        cout << "[创建目录] 准备创建 " << absolute_path << " ..." << endl;
+
+        // 根据路径查找 Inode
+        short dir_inode_id, file_inode_id;
+        _search_inode(path, dir_inode_id, file_inode_id);
+
+        if (dir_inode_id == -1)
+        {
+            cout << "[创建目录] 路径 " << absolute_path << " 无效" << endl;
+            return;
+        }
+
+        // 如果 file_inode_id 不为 -1，则说明文件已存在
+        if (file_inode_id != -1)
+        {
+            cout << "[创建目录] 文件 " << absolute_path << " 已存在" << endl;
+            return;
+        }
+
+        if (superblock->available_inode_num == 0)
+        {
+            cout << "[创建目录] 可用 Inode 不足，目录创建失败！" << endl;
+            return;
+        }
+
+        if (superblock->available_block_num < 1)
+        {
+            cout << "[创建目录] 可用块不足，目录创建失败！" << endl;
+            return;
+        }
+
+        // 申请新可用 Inode 和 Block
+        short new_inode_id = _get_avail_inode();
+        cout << "[创建目录] 已申请新 Inode：" << new_inode_id << endl;
+
+        short new_block_id = _get_avail_block();
+        cout << "[创建目录] 已申请新 Block：" << new_block_id << endl;
+
+        // 写入新 Inode
+        INode new_inode = INode();
+        new_inode.id = new_inode_id;
+        new_inode.file_type = 'd';
+        new_inode.create_time = Util::get_current_time();
+        new_inode.modify_time = Util::get_current_time();
+        new_inode.link_cnt = 1;
+        new_inode.direct_block[0] = new_block_id;
+        _create_blank_dentries(new_block_id);
+
+        cout << "[创建目录] 新 Inode 信息：" << endl;
+        cout << new_inode << endl;
+
+        // 向新文件所在的目录添加目录项
+        _add_dentry(dir_inode_id, new_inode_id, _filename(path));
+
+        // 保存 Inode
+        _save_inode(new_inode);
+
+        cout << "[创建目录] 目录 " << absolute_path << " 创建成功" << endl;
+    }
+
+    // 递归获取一个目录下的所有 inode id（包括该目录）
+    vector<short> get_all_sub_inode_id(INode inode)
+    {
+        if (inode.file_type != 'd')
+        {
+            // 返回自己的 inode_id
+            return {inode.id};
+        }
+
+        else if (inode.file_type == 'd')
+        {
+            vector<short> inode_id_list = {inode.id};
+            vector<Dentry> dentry_list = _load_dentries(inode);
+            for (auto dentry : dentry_list)
+            {
+                short inode_id = dentry.inode_id;
+                INode _inode = _get_inode(inode_id);
+                vector<short> sub_inode_id_list = get_all_sub_inode_id(_inode);
+                inode_id_list.insert(inode_id_list.end(), sub_inode_id_list.begin(), sub_inode_id_list.end());
+            }
+            return inode_id_list;
+        }
     }
 
     char *_load_file(INode inode)
@@ -1275,7 +1283,7 @@ public:
     }
 
     // 传入目录路径，创建目录
-    void create_dir(string &path)
+    void __create_dir(string &path)
     {
         // 将路径转为绝对路径
         string absolute_path = _absolute_path(path);
@@ -1343,9 +1351,6 @@ public:
 
         // 保存 inode
         _dump(&new_inode, INODE_TABLE_START + new_inode_id * INODE_SIZE, INODE_SIZE);
-
-        // 保存 bitmap
-        _save_bitmap();
 
         cout << "目录 " << absolute_path << " 创建成功" << endl;
     }
@@ -1495,9 +1500,6 @@ public:
 
             // 保存 inode
             _save_inode(new_inode);
-
-            // 保存 bitmap
-            _save_bitmap();
 
             cout << "文件 " << absolute_src << " 复制到 " << absolute_dst << " 成功" << endl;
 
@@ -1649,6 +1651,111 @@ public:
     //     printf("剩余大小：%d KB\n", superblock->available_block_num * BLOCK_SIZE / 1024);
     // }
 
+    void remove_file(string &path, bool recursive = false)
+    {
+
+        // 将路径转为绝对路径
+        string absolute_path = _absolute_path(path);
+
+        // 寻找 path 的 inode
+        short dir_inode_id, file_inode_id;
+        _search_inode(path, dir_inode_id, file_inode_id);
+
+        // 如果 file_inode_id 为 -1，则说明文件不存在
+        if (file_inode_id == -1)
+        {
+            cout << "文件 " << absolute_path << " 不存在" << endl;
+            return;
+        }
+
+        // 获取目录和文件的 inode
+        INode dir_inode = _get_inode(dir_inode_id);
+        INode file_inode = _get_inode(file_inode_id);
+
+        // 如果是目录，recursive 为 false，则不允许删除
+        if (file_inode.file_type == 'd' && !recursive)
+        {
+            cout << "文件 " << absolute_path << " 是目录，不允许删除" << endl;
+            return;
+        }
+
+        // 如果是文件
+        if (file_inode.file_type == 'f')
+        {
+            vector<string> path_vector = _split_path(path);
+            string filename = path_vector.back();
+
+            // 删除所有数据块
+            vector<short> block_id_list = _get_block_list(file_inode);
+            for (auto id : block_id_list)
+            {
+                _clear_block(id);
+            }
+
+            // 删除所有间接地址块
+            // vector<short> *indirect_block_list = _get_addr_block_list(file_inode);
+            for (auto id : _get_addr_block_list(file_inode))
+            {
+                _clear_block(id);
+            }
+
+            // 删除目录项
+            delete_dentry(dir_inode, filename);
+            cout << "文件 " << path << " 删除成功" << endl;
+
+            // 删除文件 inode
+            _clear_inode(file_inode_id);
+        }
+
+        // // 如果是目录，并且 recursive 为 true
+        // if (file_inode.file_type == 'd' && recursive)
+        // {
+        //     // 获取目录下所有 inode_id
+        //     vector<short> inode_id_list = get_all_sub_inode_id(file_inode);
+        //     // 逐个删除
+        //     for (auto id : inode_id_list)
+        //     {
+        //         INode inode = inode_table[id];
+        //         if (inode.file_type == 'f')
+        //         {
+        //             // 删除所有数据块
+        //             vector<short> block_id_list = _get_block_list(inode);
+        //             for (auto id : block_id_list)
+        //             {
+        //                 _clear_block(id);
+        //             }
+
+        //             // 删除所有间接地址块
+        //             vector<short> *indirect_block_list = _get_addr_block_list(inode);
+        //             for (auto id : *indirect_block_list)
+        //             {
+        //                 _clear_block(id);
+        //             }
+
+        //             // 删除目录项
+        //             delete_dentry(dir_inode, filename);
+        //             printf("文件 %s 删除成功\n", path);
+
+        //             // 删除文件 inode
+        //             _clear_inode(id);
+        //         }
+        //     }
+        //     for (auto id : inode_id_list)
+        //     {
+        //         INode inode = inode_table[id];
+        //         if (inode.file_type == 'd')
+        //         {
+        //             // 删除目录项
+        //             delete_dentry(dir_inode, filename);
+        //             printf("目录 %s 删除成功\n", path);
+
+        //             // 删除目录 inode
+        //             _clear_inode(id);
+        //         }
+        //     }
+        // }
+    }
+
     // 打印 bitmap
     void _show_bitmap()
     {
@@ -1667,13 +1774,6 @@ public:
         for (int i = 0; i < INODE_BITMAP_SIZE; i++)
             cout << (int)inode_bitmap_->bitmap[i];
         cout << endl;
-    }
-
-    // 保存 bitmap
-    void _save_bitmap()
-    {
-        _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
     }
 };
 
