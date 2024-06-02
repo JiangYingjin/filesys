@@ -8,6 +8,8 @@
                 "-fdiagnostics-color=always",
                 "-g",
                 "${file}",
+                // "-fstack-protector-all",
+                // "-Wstack-protector",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}"
             ],

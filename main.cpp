@@ -45,6 +45,8 @@ sum     =
 */
 
 // #pragma GCC optimize("no-stack-protector")
+// #pragma GCC optimize("stack-protector-all")
+// #pragma GCC optimize("stack-protector-strong")
 
 #include <iostream>
 #include <fstream>
@@ -62,6 +64,7 @@ sum     =
 #include <regex>
 #include <map>
 #include <iomanip>
+#include <cassert>
 
 using namespace std;
 
@@ -101,6 +104,33 @@ using namespace std;
 #define NUM_DOUBLE_INDIRECT_BLOCK (1)
 
 #define ROOT_INODE_ID (0)
+
+const map<string, int> FILESYS_INFO = {
+    {"FILESYSTEM_SIZE", FILESYSTEM_SIZE},
+    {"BLOCK_SIZE", BLOCK_SIZE},
+    {"INODE_SIZE", INODE_SIZE},
+    {"BLOCK_NUM", BLOCK_NUM},
+    {"INODE_NUM", INODE_NUM},
+    {"MAX_FILE_SIZE", MAX_FILE_SIZE},
+    {"MAX_FILENAME_SIZE", MAX_FILENAME_SIZE},
+    {"DENTRY_SIZE", DENTRY_SIZE},
+    {"DENTRY_NUM_PER_BLOCK", DENTRY_NUM_PER_BLOCK},
+    {"SUPERBLOCK_SIZE", SUPERBLOCK_SIZE},
+    {"BLOCK_BITMAP_SIZE", BLOCK_BITMAP_SIZE},
+    {"INODE_BITMAP_SIZE", INODE_BITMAP_SIZE},
+    {"INODE_TABLE_SIZE", INODE_TABLE_SIZE},
+    {"SUPERBLOCK_START", SUPERBLOCK_START},
+    {"BLOCK_BITMAP_START", BLOCK_BITMAP_START},
+    {"INODE_BITMAP_START", INODE_BITMAP_START},
+    {"INODE_TABLE_START", INODE_TABLE_START},
+    {"BLOCK_START", BLOCK_START},
+    {"DATA_BLOCK_NUM", DATA_BLOCK_NUM},
+    {"ADDRESS_SIZE", ADDRESS_SIZE},
+    {"ADDRESS_PER_BLOCK", ADDRESS_PER_BLOCK},
+    {"NUM_DIRECT_BLOCK", NUM_DIRECT_BLOCK},
+    {"NUM_INDIRECT_BLOCK", NUM_INDIRECT_BLOCK},
+    {"NUM_DOUBLE_INDIRECT_BLOCK", NUM_DOUBLE_INDIRECT_BLOCK},
+    {"ROOT_INODE_ID", ROOT_INODE_ID}};
 
 class Util
 {
@@ -164,7 +194,7 @@ public:
 
     SuperBlock()
     {
-        cout << *this;
+        // cout << *this;
     }
 
     friend ostream &operator<<(ostream &os, const SuperBlock &superblock)
@@ -195,14 +225,14 @@ public:
     char filename[MAX_FILENAME_SIZE + 1]; // 最后一位必须保留为 '\0'
 
     Dentry()
+        : inode_id(-1)
     {
-        inode_id = -1;
         set_filename("unknown");
     }
 
     Dentry(short inode_id, string filename)
+        : inode_id(inode_id)
     {
-        this->inode_id = inode_id;
         set_filename(filename);
     }
 
@@ -234,6 +264,23 @@ public:
         os << "------------------------------------------" << endl;
         return os;
     }
+
+    // 复制构造函数
+    Dentry(const Dentry &dentry)
+        : inode_id(dentry.inode_id)
+    {
+        strcpy(this->filename, dentry.filename);
+        // this->set_filename(dentry.get_filename());
+    }
+
+    // 赋值运算符重载
+    Dentry &operator=(const Dentry &dentry)
+    {
+        this->inode_id = dentry.inode_id;
+        strcpy(this->filename, dentry.filename);
+        // this->set_filename(dentry.get_filename());
+        return *this;
+    }
 };
 
 class INode
@@ -250,8 +297,8 @@ public:
     short double_indirect_block[NUM_DOUBLE_INDIRECT_BLOCK]; // 双重间接地址，占用 2 Byte
                                                             // 总共 41 Byte
     INode()
+        : id(-1), file_type('f'), file_size(BLOCK_SIZE), create_time(0), modify_time(0), link_cnt(0)
     {
-        this->id = -1;
         clear_address();
     }
 
@@ -373,22 +420,20 @@ public:
         fstream file(FILESYSTEM_NAME, ios::in | ios::out | ios::binary);
         if (!file)
             cout << "文件打开失败" << endl;
-        // cout << "pos: " << pos << " size: " << size << endl;
         file.seekg(pos, ios::beg);
-        // cout << "pos: " << file.tellg() << endl;
         file.read((char *)data, size);
-        // cout << string((char *)data) << endl;
         file.close();
     }
 
     // 创建文件系统
     void _create_filesys()
     {
+        fstream file(FILESYSTEM_NAME, ios::out | ios::binary | ios::trunc);
         char *data = new char[FILESYSTEM_SIZE];
         memset(data, 0, FILESYSTEM_SIZE);
-        fstream file(FILESYSTEM_NAME, ios::out | ios::binary | ios::trunc);
         file.write(data, FILESYSTEM_SIZE);
         file.close();
+        delete[] data;
 
         superblock = new SuperBlock();
         block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
@@ -1004,7 +1049,7 @@ public:
 
     void _load_dentries(const INode &inode, vector<Dentry> &dentry_list)
     {
-        // cout << "[读取目录项] 读取如下 INode 的目录项 ..." << endl;
+        cout << "[读取目录项] 读取如下 INode 的目录项 ..." << endl;
         cout << inode << endl;
 
         if (inode.file_type != 'd')
@@ -1811,33 +1856,6 @@ public:
     // 打印所有的宏定义
     static void _show_macros()
     {
-        map<string, int> FILESYS_INFO = {
-            {"FILESYSTEM_SIZE", FILESYSTEM_SIZE},
-            {"BLOCK_SIZE", BLOCK_SIZE},
-            {"INODE_SIZE", INODE_SIZE},
-            {"BLOCK_NUM", BLOCK_NUM},
-            {"INODE_NUM", INODE_NUM},
-            {"MAX_FILE_SIZE", MAX_FILE_SIZE},
-            {"MAX_FILENAME_SIZE", MAX_FILENAME_SIZE},
-            {"DENTRY_SIZE", DENTRY_SIZE},
-            {"DENTRY_NUM_PER_BLOCK", DENTRY_NUM_PER_BLOCK},
-            {"SUPERBLOCK_SIZE", SUPERBLOCK_SIZE},
-            {"BLOCK_BITMAP_SIZE", BLOCK_BITMAP_SIZE},
-            {"INODE_BITMAP_SIZE", INODE_BITMAP_SIZE},
-            {"INODE_TABLE_SIZE", INODE_TABLE_SIZE},
-            {"SUPERBLOCK_START", SUPERBLOCK_START},
-            {"BLOCK_BITMAP_START", BLOCK_BITMAP_START},
-            {"INODE_BITMAP_START", INODE_BITMAP_START},
-            {"INODE_TABLE_START", INODE_TABLE_START},
-            {"BLOCK_START", BLOCK_START},
-            {"DATA_BLOCK_NUM", DATA_BLOCK_NUM},
-            {"ADDRESS_SIZE", ADDRESS_SIZE},
-            {"ADDRESS_PER_BLOCK", ADDRESS_PER_BLOCK},
-            {"NUM_DIRECT_BLOCK", NUM_DIRECT_BLOCK},
-            {"NUM_INDIRECT_BLOCK", NUM_INDIRECT_BLOCK},
-            {"NUM_DOUBLE_INDIRECT_BLOCK", NUM_DOUBLE_INDIRECT_BLOCK},
-            {"ROOT_INODE_ID", ROOT_INODE_ID}};
-
         cout << "----------- 文件系统预定义常量 -----------" << endl;
         for (const auto &pair : FILESYS_INFO)
         {
@@ -1854,6 +1872,12 @@ int main(int argc, char *argv[])
 
     FileSystem fs;
 
+    // 打印 FILESYS_INFO 的大小
+    cout << sizeof(FILESYS_INFO) << endl;
+
+    fs.sum();
+    // fs._show_bitmap();
+
     // // 创建文件测试
     // fs.create_file("/abc", 600);
     // fs.sum();
@@ -1861,17 +1885,17 @@ int main(int argc, char *argv[])
     // fs.create_file("/root/abc", 600);
     // fs.create_file("/root/.abc", 600);
 
-    // 创建文件夹简单测试
-    fs.create_dir("root");
-    fs.create_dir("root/def");
-    fs.create_dir("root/.def");
-    fs.create_dir("root/.def/.ghi");
-    fs.create_dir("/def");
-    fs.create_dir("/.def");
-    // 创建文件 / 文件夹 / 打印文件内容联测
-    fs.change_dir("root/.def/.ghi");
-    fs.create_file("abc", 10);
-    fs.cat("/root/.def/.ghi/abc");
+    // // 创建文件夹简单测试
+    // fs.create_dir("root");
+    // fs.create_dir("root/def");
+    // fs.create_dir("root/.def");
+    // fs.create_dir("root/.def/.ghi");
+    // fs.create_dir("/def");
+    // fs.create_dir("/.def");
+    // // 创建文件 / 文件夹 / 打印文件内容联测
+    // fs.change_dir("root/.def/.ghi");
+    // fs.create_file("abc", 10);
+    // fs.cat("/root/.def/.ghi/abc");
 
     // // 打印文件测试
     // fs.cat("/abc");
@@ -1906,10 +1930,10 @@ int main(int argc, char *argv[])
     // // 文件实际占用块数
     // cout << Util::block_occupation(15890) << endl;
 
-    // 列出目录测试
-    for (int i = 1; i <= 10; i++)
-        fs.create_file("/f" + to_string(i), 1);
-    fs.list_dir();
+    // // 列出目录测试
+    // for (int i = 1; i <= 10; i++)
+    //     fs.create_file("/f" + to_string(i), 1);
+    // fs.list_dir();
 
     // // 打印 block_bitmap 的大小
     // printf("Block bitmap size: %d\n", BLOCK_BITMAP_SIZE); // 2048
