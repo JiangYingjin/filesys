@@ -342,12 +342,14 @@ public:
 class Bitmap
 {
 public:
-    char *bitmap;
+    vector<char> bitmap;
+    // char *bitmap;
 
     Bitmap(int size_byte)
     {
-        bitmap = new char[size_byte];
-        memset(bitmap, 0, size_byte);
+        bitmap.resize(size_byte, 0);
+        // bitmap = new char[size_byte];
+        // memset(bitmap, 0, size_byte);
     }
 
     // 设置 bitmap 的特定 bit
@@ -369,12 +371,11 @@ class FileSystem
 {
 
 public:
-    FILE *fp;
-
     // 持久化数据
-    SuperBlock *superblock;
-    Bitmap *block_bitmap;
-    Bitmap *inode_bitmap;
+    // 问题出在这些指针
+    SuperBlock superblock;
+    Bitmap block_bitmap = Bitmap(BLOCK_BITMAP_SIZE);
+    Bitmap inode_bitmap = Bitmap(INODE_BITMAP_SIZE);
 
     // 运行时数据
     string working_dir;
@@ -392,17 +393,35 @@ public:
         {
             cout << "文件系统存在，加载中 ..." << endl;
 
-            superblock = new SuperBlock();
-            block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
-            inode_bitmap = new Bitmap(INODE_BITMAP_SIZE);
+            _load(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+            _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+            _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
 
-            _load(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
-            _load(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-            _load(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+            // superblock = new SuperBlock();
+            // block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
+            // inode_bitmap = new Bitmap(INODE_BITMAP_SIZE);
+            // _load(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+            // _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+            // _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
 
             cout << "文件系统加载成功" << endl;
         }
         _init_working_dir();
+    }
+
+    ~FileSystem()
+    {
+        cout << "正在退出文件系统 ..." << endl;
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        // _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        // _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        // _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        // delete superblock;
+        // delete block_bitmap;
+        // delete inode_bitmap;
+        cout << "文件系统退出成功" << endl;
     }
 
     void _dump(const void *data, int pos, int size)
@@ -435,13 +454,16 @@ public:
         file.close();
         delete[] data;
 
-        superblock = new SuperBlock();
-        block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
-        inode_bitmap = new Bitmap(INODE_BITMAP_SIZE);
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
 
-        _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
-        _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        // superblock = new SuperBlock();
+        // block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
+        // inode_bitmap = new Bitmap(INODE_BITMAP_SIZE);
+        // _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        // _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        // _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
 
         _init_root_dir();
     }
@@ -453,7 +475,7 @@ public:
 
         // Inode
         INode root_inode = INode();
-        superblock->available_inode_num--;
+        superblock.available_inode_num--;
         root_inode.id = ROOT_INODE_ID;
         root_inode.file_type = 'd';
         root_inode.file_size = BLOCK_SIZE;
@@ -463,14 +485,14 @@ public:
         root_inode.direct_block[0] = _get_avail_block();
         cout << root_inode;
         _save_inode(root_inode);
-        _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
 
         // 数据块
         _create_blank_dentries(root_inode.direct_block[0]);
 
         // Bitmap
-        inode_bitmap->set(ROOT_INODE_ID);
-        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        inode_bitmap.set(ROOT_INODE_ID);
+        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
         // _show_bitmap();
     }
 
@@ -478,8 +500,7 @@ public:
     {
         working_dir = "/";
         working_dir_inode_id = ROOT_INODE_ID;
-        cout << "working_dir: " << working_dir << endl;
-        cout << "working_dir_inode_id: " << working_dir_inode_id << endl;
+        cout << "[初始化工作目录] 当前工作目录为 " << working_dir << "（INode ID 为 " << working_dir_inode_id << "）" << endl;
     }
 
     bool _is_filesys_exist()
@@ -493,16 +514,16 @@ public:
     // 获取可用块 ID 并在 bitmap 中标记已使用
     short _get_avail_block()
     {
-        for (int i = 0; i < superblock->block_num; i++)
-            if (!block_bitmap->get(i))
+        for (int i = 0; i < superblock.block_num; i++)
+            if (!block_bitmap.get(i))
             {
                 cout << "[可用块申请] 新申请：" << i << endl;
                 // Bitmap
-                block_bitmap->set(i);
-                _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+                block_bitmap.set(i);
+                _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
                 // Superblock
-                superblock->available_block_num--;
-                _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+                superblock.available_block_num--;
+                _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
                 return i;
             }
 
@@ -513,16 +534,16 @@ public:
     // 获取可用 inode ID 并在 bitmap 中标记已使用
     short _get_avail_inode()
     {
-        for (int i = 0; i < superblock->inode_num; i++)
-            if (!inode_bitmap->get(i))
+        for (int i = 0; i < superblock.inode_num; i++)
+            if (!inode_bitmap.get(i))
             {
                 cout << "[可用 INode 申请] 新申请：" << i << endl;
                 // Bitmap
-                inode_bitmap->set(i);
-                _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+                inode_bitmap.set(i);
+                _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
                 // Superblock
-                superblock->available_inode_num--;
-                _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+                superblock.available_inode_num--;
+                _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
                 return i;
             }
 
@@ -538,11 +559,11 @@ public:
         // delete[] block;
 
         // Bitmap
-        block_bitmap->set(id, 0);
-        _dump(block_bitmap->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        block_bitmap.set(id, 0);
+        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
         // Superblock
-        superblock->available_block_num++;
-        _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        superblock.available_block_num++;
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
     }
 
     void _clear_inode(short id)
@@ -551,11 +572,11 @@ public:
         // _dump(&_blank_inode, INODE_TABLE_START + id * INODE_SIZE, INODE_SIZE);
 
         // Bitmap
-        inode_bitmap->set(id, 0);
-        _dump(inode_bitmap->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        inode_bitmap.set(id, 0);
+        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
         // Superblock
-        superblock->available_inode_num++;
-        _dump(superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
+        superblock.available_inode_num++;
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_SIZE);
     }
 
     // 目录 d 的数据块
@@ -1170,15 +1191,15 @@ public:
             return;
         }
 
-        if (superblock->available_inode_num == 0)
+        if (superblock.available_inode_num == 0)
         {
             cout << "[创建文件] 可用 Inode 不足，文件创建失败！" << endl;
             return;
         }
 
-        if (superblock->available_block_num < Util::block_occupation(filesize_kb))
+        if (superblock.available_block_num < Util::block_occupation(filesize_kb))
         {
-            cout << "[创建文件] 可用块不足，文件创建失败！创建大小为 " << filesize_kb << "KB 的文件需要 " << Util::block_occupation(filesize_kb) << " 个块，目前可用块剩余 " << superblock->available_block_num << " 个" << endl;
+            cout << "[创建文件] 可用块不足，文件创建失败！创建大小为 " << filesize_kb << "KB 的文件需要 " << Util::block_occupation(filesize_kb) << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
             return;
         }
 
@@ -1250,13 +1271,13 @@ public:
             return;
         }
 
-        if (superblock->available_inode_num == 0)
+        if (superblock.available_inode_num == 0)
         {
             cout << "[创建目录] 可用 Inode 不足，目录创建失败！" << endl;
             return;
         }
 
-        if (superblock->available_block_num < 1)
+        if (superblock.available_block_num < 1)
         {
             cout << "[创建目录] 可用块不足，目录创建失败！" << endl;
             return;
@@ -1524,7 +1545,7 @@ public:
 
     //         // 根据 src 文件大小获取可用 block id
     //         // 检查 superblock 中的 available_block_num 是否足够
-    //         if (superblock->available_block_num < src_file_inode.file_size / BLOCK_SIZE)
+    //         if (superblock.available_block_num < src_file_inode.file_size / BLOCK_SIZE)
     //         {
     //             printf("block 用尽\n");
     //             return -1;
@@ -1596,7 +1617,7 @@ public:
 
     //     //         // 根据 src 文件大小获取可用 block id
     //     //         // 检查 superblock 中的 available_block_num 是否足够
-    //     //         if (superblock->available_block_num < inode.file_size / BLOCK_SIZE)
+    //     //         if (superblock.available_block_num < inode.file_size / BLOCK_SIZE)
     //     //         {
     //     //             printf("block 用尽\n");
     //     //             return -1;
@@ -1825,31 +1846,34 @@ public:
         // for (int i = 0; i < DATA_BLOCK_NUM; i++)
         //     block_bitmap_sum += block_bitmap->get(i);
         // for (int i = 0; i < INODE_NUM; i++)
-        //     inode_bitmap_sum += inode_bitmap->get(i);
+        //     inode_bitmap_sum += inode_bitmap.get(i);
         // cout << "block_bitmap_sum: " << block_bitmap_sum << " " << 516 + block_bitmap_sum << endl;
         // cout << "inode_bitmap_sum: " << inode_bitmap_sum << endl;
 
-        cout << *superblock;
+        cout << superblock;
         FileSystem::_show_macros();
     }
 
     // 打印 bitmap
     void _show_bitmap()
     {
-        Bitmap *block_bitmap_ = new Bitmap(BLOCK_BITMAP_SIZE);
-        Bitmap *inode_bitmap_ = new Bitmap(INODE_BITMAP_SIZE);
+        Bitmap block_bitmap_ = Bitmap(BLOCK_BITMAP_SIZE);
+        Bitmap inode_bitmap_ = Bitmap(INODE_BITMAP_SIZE);
 
-        _load(block_bitmap_->bitmap, BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _load(inode_bitmap_->bitmap, INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
+
+        // assert(block_bitmap_.bitmap == block_bitmap.bitmap);
+        // assert(inode_bitmap_.bitmap == inode_bitmap.bitmap);
 
         cout << "Block Bitmap: " << endl;
         for (int i = 0; i < BLOCK_BITMAP_SIZE; i++)
-            cout << (int)block_bitmap_->bitmap[i];
+            cout << (int)block_bitmap_.bitmap[i];
         cout << endl;
 
         cout << "INode Bitmap: " << endl;
         for (int i = 0; i < INODE_BITMAP_SIZE; i++)
-            cout << (int)inode_bitmap_->bitmap[i];
+            cout << (int)inode_bitmap_.bitmap[i];
         cout << endl;
     }
 
@@ -1872,11 +1896,9 @@ int main(int argc, char *argv[])
 
     FileSystem fs;
 
-    // 打印 FILESYS_INFO 的大小
-    cout << sizeof(FILESYS_INFO) << endl;
-
     fs.sum();
-    // fs._show_bitmap();
+
+    fs._show_bitmap();
 
     // // 创建文件测试
     // fs.create_file("/abc", 600);
