@@ -895,9 +895,9 @@ public:
         {
             // 获取当前目录级别的数据块
             // cout << "[查找 Inode] 当前目录级别：" << level << endl;
-            // vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
-            vector<Dentry> _dentry_list;
-            _load_dentries(ptr_inode_id, _dentry_list);
+            vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
+            // vector<Dentry> _dentry_list;
+            // _load_dentries(ptr_inode_id, _dentry_list);
 
             // cout << "[查找 Inode] 当前目录项：" << endl;
             // for (const auto &dentry : _dentry_list)
@@ -1080,7 +1080,7 @@ public:
         _add_dentry(dir_inode, new_inode_id, filename);
     }
 
-    void _load_dentries(const INode &inode, vector<Dentry> &dentry_list)
+    vector<Dentry> _load_dentries(const INode &inode)
     {
         cout << "[读取目录项] 读取如下 INode 的目录项 ..." << endl;
         cout << inode << endl;
@@ -1088,10 +1088,10 @@ public:
         if (inode.file_type != 'd')
         {
             cout << "[读取目录项] 该 INode 不是目录，读取失败！" << endl;
-            dentry_list.clear();
+            return {};
         }
 
-        // vector<Dentry> dentry_list;
+        vector<Dentry> dentry_list;
         vector<short> block_id_list = _get_block_list(inode);
         // cout << "[读取目录项] 该 INode 对应的 Dentry 数据块个数：" << block_id_list.size() << endl;
 
@@ -1118,19 +1118,19 @@ public:
         //     cout << dentry << endl;
         // cout << "[读取目录项] 读取到的目录项数量：" << dentry_list.size() << endl;
 
-        // return dentry_list;
+        return dentry_list;
     }
 
-    void _load_dentries(const short &inode_id, vector<Dentry> &dentry_list)
-    {
-        _load_dentries(_get_inode(inode_id), dentry_list);
-    }
-
-    // vector<Dentry> _load_dentries(short inode_id)
+    // void _load_dentries(const short &inode_id, vector<Dentry> &dentry_list)
     // {
-    //     INode inode = _get_inode(inode_id);
-    //     return _load_dentries(inode);
+    //     _load_dentries(_get_inode(inode_id), dentry_list);
     // }
+
+    vector<Dentry> _load_dentries(short inode_id)
+    {
+        INode inode = _get_inode(inode_id);
+        return _load_dentries(inode);
+    }
 
     // vector<Dentry> _load_dentries(string &path)
     // {
@@ -1426,9 +1426,9 @@ public:
             }
             else
             {
-                // vector<Dentry> dentry_list = _load_dentries(_inode);
-                vector<Dentry> dentry_list;
-                _load_dentries(_inode, dentry_list);
+                vector<Dentry> dentry_list = _load_dentries(_inode);
+                // vector<Dentry> dentry_list;
+                // _load_dentries(_inode, dentry_list);
                 cout << "[列出目录] 目录 " << absolute_path << " 内容如下：" << endl;
                 for (const auto &dentry : dentry_list)
                 {
