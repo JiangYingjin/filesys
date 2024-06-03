@@ -472,7 +472,7 @@ public:
         _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
 
         // 数据块
-        _create_blank_dentries(root_inode.direct_block[0]);
+        _create_blank_dentries(root_inode.direct_block[0], ROOT_INODE_ID, ROOT_INODE_ID);
 
         // Bitmap
         inode_bitmap.set(ROOT_INODE_ID);
@@ -551,11 +551,6 @@ public:
 
     void _clear_block(short id)
     {
-        // char *block = new char[BLOCK_SIZE];
-        // memset(block, 0, BLOCK_SIZE);
-        // _dump(block, BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
-        // delete[] block;
-
         // Bitmap
         block_bitmap.set(id, 0);
         _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
@@ -564,11 +559,19 @@ public:
         _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
     }
 
+    void _clear_block(vector<short> &block_id_list)
+    {
+        // Bitmap
+        for (const auto &block_id : block_id_list)
+            block_bitmap.set(block_id, 0);
+        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        // Superblock
+        superblock.available_block_num += block_id_list.size();
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
+    }
+
     void _clear_inode(short id)
     {
-        // INode _blank_inode = INode();
-        // _dump(&_blank_inode, INODE_TABLE_START + id * INODE_SIZE, INODE_CLASS_SIZE);
-
         // Bitmap
         inode_bitmap.set(id, 0);
         _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
@@ -578,12 +581,18 @@ public:
     }
 
     // 目录 d 的数据块
-    void _create_blank_dentries(short block_id)
+    void _create_blank_dentries(const short &block_id, const short &curr_dir_inode_id, const short &parent_dir_inode_id)
     {
-        Dentry *dentry = new Dentry[DENTRY_NUM_PER_BLOCK];
-        fill_n(dentry, DENTRY_NUM_PER_BLOCK, Dentry());
-        _dump(dentry, BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
-        delete[] dentry;
+        vector<Dentry> dentry(DENTRY_NUM_PER_BLOCK);
+        dentry[0] = Dentry(curr_dir_inode_id, ".");
+        dentry[1] = Dentry(parent_dir_inode_id, "..");
+        _dump(dentry.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
+    }
+
+    void _create_blank_dentries(const short &block_id)
+    {
+        vector<Dentry> dentry(DENTRY_NUM_PER_BLOCK);
+        _dump(dentry.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
     }
 
     // inode 的间接地址数据块
@@ -748,12 +757,12 @@ public:
                 indirect_block_list.push_back(inode.double_indirect_block[i]);
 
                 // 读取二级间接块
-                unique_ptr<Dentry[]> dentry(new Dentry[DENTRY_NUM_PER_BLOCK]);
-                _load(dentry.get(), BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
-                for (int j = 0; j < DENTRY_NUM_PER_BLOCK; j++)
-                    if (dentry[j].inode_id != -1)
+                vector<Dentry> dentry(ADDRESS_PER_BLOCK);
+                _load(dentry.data(), BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                for (const auto &entry : dentry)
+                    if (entry.inode_id != -1)
                         // 将二级中的第二级数据块加入列表
-                        indirect_block_list.push_back(dentry[j].inode_id);
+                        indirect_block_list.push_back(entry.inode_id);
             }
 
         return indirect_block_list;
@@ -1292,7 +1301,7 @@ public:
         new_inode.modify_time = Util::get_current_time();
         new_inode.link_cnt = 1;
         new_inode.direct_block[0] = new_block_id;
-        _create_blank_dentries(new_block_id);
+        _create_blank_dentries(new_block_id, new_inode_id, dir_inode_id);
 
         cout << "[创建目录] 新 Inode 信息：" << endl;
         cout << new_inode << endl;
@@ -1310,9 +1319,28 @@ public:
 
     void _remove(const short &dir_inode_id, const short &file_inode_id)
     {
+        // 删除特定文件
         if (file_inode_id > 0)
         {
-            // 删除特定文件
+            INode file_inode = _get_inode(file_inode_id);
+            cout << "[删除文件] 正在删除如下文件：" << endl;
+            cout << file_inode;
+
+            // 释放文件的数据块
+            vector<short> block_id_list = _get_block_list(file_inode);
+            cout << "[删除文件] 删除该文件的数据块：" << block_id_list << endl;
+            _clear_block(block_id_list);
+
+            // 释放文件的间接地址块
+            vector<short> addr_block_list = _get_addr_block_list(file_inode);
+            cout << "[删除文件] 删除该文件的地址块：" << addr_block_list << endl;
+            _clear_block(addr_block_list);
+
+            // 释放文件的 INode
+            cout << "[删除文件] 删除文件的 INode" << endl;
+            _clear_inode(file_inode_id);
+
+            // 删除该文件对应的目录项
         }
     }
 
@@ -1843,16 +1871,6 @@ public:
 
     void sum()
     {
-        // // 计算 bitmap 上 1 的总个数
-        // int block_bitmap_sum = 0;
-        // int inode_bitmap_sum = 0;
-        // for (int i = 0; i < DATA_BLOCK_NUM; i++)
-        //     block_bitmap_sum += block_bitmap->get(i);
-        // for (int i = 0; i < INODE_NUM; i++)
-        //     inode_bitmap_sum += inode_bitmap.get(i);
-        // cout << "block_bitmap_sum: " << block_bitmap_sum << " " << 516 + block_bitmap_sum << endl;
-        // cout << "inode_bitmap_sum: " << inode_bitmap_sum << endl;
-
         cout << superblock;
         FileSystem::_show_macros();
     }
@@ -1869,6 +1887,22 @@ public:
         for (int i = 0; i < INODE_BITMAP_SIZE; i++)
             cout << (int)inode_bitmap.bitmap[i];
         cout << endl;
+    }
+
+    void _vaildate_bitmap_consistency()
+    {
+        // 计算 bitmap 上 1 的总个数
+        int block_bitmap_sum = 0;
+        int inode_bitmap_sum = 0;
+        for (int i = 0; i < DATA_BLOCK_NUM; i++)
+            block_bitmap_sum += block_bitmap.get(i);
+        for (int i = 0; i < INODE_NUM; i++)
+            inode_bitmap_sum += inode_bitmap.get(i);
+
+        cout << "block_bitmap_sum: " << block_bitmap_sum << " " << 516 + block_bitmap_sum << endl;
+        cout << "inode_bitmap_sum: " << inode_bitmap_sum << endl;
+
+        cout << superblock;
     }
 
     // 打印所有的宏定义
@@ -1940,7 +1974,7 @@ int main(int argc, char *argv[])
     // fs.create_file("/.abc", 600);
     // fs.create_file("/root/abc", 600);
     // fs.create_file("/root/.abc", 600);
-    // fs.list_dir();
+    fs.list_dir();
     // fs.sum();
 
     // 创建文件夹简单测试
@@ -1956,15 +1990,15 @@ int main(int argc, char *argv[])
     // fs.cat("/root/.def/.ghi/abc");
     // fs.list_dir();
     // fs.sum();
-    fs.change_dir("/root");
-    fs.change_dir("/root/.def");
-    fs.change_dir("/root/.def/.ghi");
-    fs.change_dir("/root/.def/.ghi/abc");
-    fs.change_dir("/root/.def/.ghi/xxx");
+    // fs.change_dir("/root");
+    // fs.change_dir("/root/.def");
+    // fs.change_dir("/root/.def/.ghi");
+    // fs.change_dir("/root/.def/.ghi/abc");
+    // fs.change_dir("/root/.def/.ghi/xxx");
     // fs.list_dir();
     // fs.list_dir("/");
 
-    // // 打印文件测试
+    // 打印文件测试
     // fs.cat("/abc");
 
     // // 创建文件夹数量测试
