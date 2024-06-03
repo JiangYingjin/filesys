@@ -910,8 +910,6 @@ public:
             // 获取当前目录级别的数据块
             // cout << "[查找 Inode] 当前目录级别：" << level << endl;
             vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
-            // vector<Dentry> _dentry_list;
-            // _load_dentries(ptr_inode_id, _dentry_list);
 
             // cout << "[查找 Inode] 当前目录项：" << endl;
             // for (const auto &dentry : _dentry_list)
@@ -1145,6 +1143,7 @@ public:
                 if (entry.inode_id != -1)
                     dentry_list.push_back(entry);
         }
+
         // cout << "[读取目录项] 有效 Dentry：" << endl
         //      << dentry_list << endl;
         return dentry_list;
@@ -1155,14 +1154,6 @@ public:
         INode inode = _get_inode(inode_id);
         return _load_dentries(inode);
     }
-
-    // vector<Dentry> _load_dentries(string &path)
-    // {
-    //     short dir_inode_id, file_inode_id;
-    //     _search_inode(path, dir_inode_id, file_inode_id);
-    //     INode dir_inode = _get_inode(dir_inode_id);
-    //     return _load_dentries(dir_inode);
-    // }
 
     void _save_inode(const short &inode_id, const char &file_type, const int &file_size)
     {
@@ -1377,7 +1368,7 @@ public:
             // 列出所有目录项
             vector<Dentry> dentry_list = _load_dentries(dir_inode_id);
             for (const auto &dentry : dentry_list)
-                if (dentry.inode_id != -1)
+                if (dentry.inode_id != -1 && dentry.get_filename() != "." && dentry.get_filename() != "..")
                 {
                     INode _inode = _get_inode(dentry.inode_id);
                     // 如果是文件
@@ -1512,8 +1503,6 @@ public:
             else
             {
                 vector<Dentry> dentry_list = _load_dentries(_inode);
-                // vector<Dentry> dentry_list;
-                // _load_dentries(_inode, dentry_list);
                 cout << "[列出目录] 目录 " << absolute_path << " 内容如下：" << endl;
                 for (const auto &dentry : dentry_list)
                 {
@@ -1647,20 +1636,28 @@ int main(int argc, char *argv[])
     // fs.list_dir();
     // fs.sum();
 
-    // // 创建文件夹简单测试
-    fs.create_dir("root");
-    fs.list_dir();
-    fs.create_dir("root/def");
-    fs.create_dir("root/.def");
-    // fs.create_dir("root/.def/.ghi");
-    // fs.create_dir("/def");
-    // fs.create_dir("/.def");
-    // // 创建文件 / 文件夹 / 打印文件内容联测
-    // fs.change_dir("root/.def/.ghi");
-    fs.create_file("abc", 10);
-    // fs.cat("/root/.def/.ghi/abc");
+    // // // 创建文件夹简单测试
+    // fs.create_dir("root");
+    // fs.list_dir();
+    // fs.create_dir("root/def");
+    // fs.create_dir("root/.def");
+    // // fs.create_dir("root/.def/.ghi");
+    // // fs.create_dir("/def");
+    // // fs.create_dir("/.def");
+    // // // 创建文件 / 文件夹 / 打印文件内容联测
+    // // fs.change_dir("root/.def/.ghi");
+    // fs.create_file("abc", 10);
+    // // fs.cat("/root/.def/.ghi/abc");
+    // fs.list_dir();
+    // fs.sum();
+    // fs.change_dir("/root");
+    // fs.list_dir();
+
+    // fs._remove(1, -1);
+    fs._remove(0, 4);
     fs.list_dir();
     fs.sum();
+
     // fs.change_dir("/root");
     // fs.change_dir("/root/.def");
     // fs.change_dir("/root/.def/.ghi");
