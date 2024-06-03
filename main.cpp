@@ -110,7 +110,7 @@ using namespace std;
 
 // Vector 输出重载
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec)
+ostream &operator<<(ostream &os, const vector<T> &vec)
 {
     os << "[ ";
     for (const T &element : vec)
@@ -175,6 +175,14 @@ public:
         ss << _new_size;
 
         return ss.str() + suffix[_suffix_idx];
+    }
+
+    static bool ends_with(const string &str, const string &suffix)
+    {
+        if (str.length() < suffix.length())
+            return false;
+
+        return str.substr(str.length() - suffix.length()) == suffix;
     }
 
     static void cout_center(const string str, const int width)
@@ -1102,18 +1110,32 @@ public:
         {
             _load(dentry_list.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
             for (auto &dentry : dentry_list)
+                // 找到了需要删除的目录项
                 if (dentry.inode_id == inode_id)
                 {
                     dentry = Dentry();
                     _dump(dentry_list.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
+
+                    // 文件自身硬链接数减一
+                    INode inode = _get_inode(inode_id);
+                    inode.link_cnt--;
+                    _save_inode(inode);
+                    cout << "[删除目录项] 目录项对应的 INode 硬链接数减 1：" << endl
+                         << inode;
+
+                    // 如果是目录，父目录的硬链接数减一
+                    if (_get_inode(inode_id).file_type == 'd')
+                    {
+                        INode dir_inode = _get_inode(dir_inode_id);
+                        dir_inode.link_cnt--;
+                        _save_inode(dir_inode);
+                        cout << "[删除目录项] 目录项为目录，其父目录的 INode 硬链接数减 1：" << endl
+                             << dir_inode;
+                    }
+
                     return;
                 }
         }
-
-        // 父目录的硬链接数减一
-        INode dir_inode = _get_inode(dir_inode_id);
-        dir_inode.link_cnt--;
-        _save_inode(dir_inode);
     }
 
     vector<Dentry> _load_dentries(const INode &inode)
@@ -1344,24 +1366,31 @@ public:
             cout << "[删除文件] 正在删除如下文件：" << endl;
             cout << file_inode;
 
-            // 释放文件的数据块
-            vector<short> block_id_list = _get_block_list(file_inode);
-            cout << "[删除文件] 删除该文件的数据块：" << block_id_list << endl;
-            _clear_block(block_id_list);
-
-            // 释放文件的间接地址块
-            vector<short> addr_block_list = _get_addr_block_list(file_inode);
-            cout << "[删除文件] 删除该文件的地址块：" << addr_block_list << endl;
-            _clear_block(addr_block_list);
-
-            // 释放文件的 INode
-            cout << "[删除文件] 删除文件的 INode" << endl;
-            _clear_inode(file_inode_id);
-
             // 删除该文件对应的目录项
             _remove_dentry(dir_inode_id, file_inode_id);
+
+            // 如果文件自身硬链接数降为 0，则彻底删除文件
+            if (_get_inode(file_inode_id).link_cnt == 0)
+            {
+                cout << "[删除文件] 文件硬链接数此时为 0，彻底删除文件 ..." << endl;
+
+                // 释放文件的数据块
+                vector<short> block_id_list = _get_block_list(file_inode);
+                cout << "[删除文件] 删除该文件的数据块：" << block_id_list << endl;
+                _clear_block(block_id_list);
+
+                // 释放文件的间接地址块
+                vector<short> addr_block_list = _get_addr_block_list(file_inode);
+                cout << "[删除文件] 删除该文件的地址块：" << addr_block_list << endl;
+                _clear_block(addr_block_list);
+
+                // 释放文件的 INode
+                cout << "[删除文件] 删除文件的 INode" << endl;
+                _clear_inode(file_inode_id);
+            }
             return;
         }
+
         else if (file_inode_id == -1)
         // 删除整个文件夹
         {
@@ -1381,7 +1410,13 @@ public:
 
             // 此时已经是目录下为空
             dentry_list = _load_dentries(dir_inode_id);
+            cout << "目录下的所有文件/文件夹已被递归删除，此时目录项为：" << endl;
             cout << dentry_list;
+
+            // 删除该目录在其父目录中的目录项
+            cout << "[删除目录] 删除该目录在其父目录中的目录项 ..." << endl;
+            short parent_dir_inode_id = dentry_list[1].inode_id;
+            _remove_dentry(parent_dir_inode_id, dir_inode_id);
 
             // 释放目录的数据块
             vector<short> block_id_list = _get_block_list(dir_inode_id);
@@ -1396,10 +1431,60 @@ public:
             // 释放目录的 INode
             cout << "[删除目录] 删除目录的 INode" << endl;
             _clear_inode(dir_inode_id);
+        }
+    }
 
-            // 删除该目录在其父目录中的目录项
-            short parent_dir_inode_id = dentry_list[1].inode_id;
-            _remove_dentry(parent_dir_inode_id, dir_inode_id);
+    void remove(const string &path, bool recursive = false)
+    {
+        // 将路径转为绝对路径
+        string absolute_path = _absolute_path(path);
+
+        cout << "[删除文件/目录] 准备删除 " << absolute_path << " ..." << endl;
+
+        if (absolute_path == "/")
+        {
+            cout << "[删除文件/目录] 根目录不可删除" << endl;
+            return;
+        }
+
+        if (path == "." || path == ".." || Util::ends_with(path, "/.") || Util::ends_with(path, "/.."))
+        {
+            cout << "[删除文件/目录] 不可删除 '.' 或 '..'" << endl;
+            return;
+        }
+
+        // 根据路径查找 Inode
+        short dir_inode_id, file_inode_id;
+        _search_inode(path, dir_inode_id, file_inode_id);
+
+        if (file_inode_id == -1)
+        {
+            cout << "[删除文件/目录] 文件 " << absolute_path << " 不存在" << endl;
+            return;
+        }
+
+        const INode file_inode = _get_inode(file_inode_id);
+
+        if (file_inode.file_type == 'f')
+        {
+            cout << "[删除文件/目录] 准备删除文件 " << absolute_path << " ..." << endl;
+            _remove(dir_inode_id, file_inode_id);
+            cout << "[删除文件/目录] 文件 " << absolute_path << " 已删除" << endl;
+        }
+
+        else if (file_inode.file_type == 'd')
+        {
+            if (!recursive)
+            {
+                cout << "[删除文件/目录] 无法删除目录 " << absolute_path << "，如需删除，请使用 rm -r" << endl;
+                return;
+            }
+            else if (recursive)
+            {
+                cout << "[删除文件/目录] 准备删除目录 " << absolute_path << " ..." << endl;
+                _remove(file_inode_id, -1);
+                cout << "[删除文件/目录] 目录 " << absolute_path << " 已删除" << endl;
+            }
         }
     }
 
@@ -1613,7 +1698,7 @@ public:
 //     // 使用 string_view 来查看输入字符串
 //     string_view inputView(input);
 //     // 使用 ranges::split 来拆分字符串
-//     auto words = inputView | std::views::split(' ') | std::views::transform([](auto &&range)
+//     auto words = inputView | views::split(' ') | views::transform([](auto &&range)
 //                                                                   { return string(range.begin(), range.end()); });
 
 //     // 输出拆分后的单词
@@ -1638,6 +1723,7 @@ int main(int argc, char *argv[])
 
     // // // 创建文件夹简单测试
     // fs.create_dir("root");
+    // fs.remove("root", 1);
     // fs.list_dir();
     // fs.create_dir("root/def");
     // fs.create_dir("root/.def");
@@ -1647,14 +1733,19 @@ int main(int argc, char *argv[])
     // // // 创建文件 / 文件夹 / 打印文件内容联测
     // // fs.change_dir("root/.def/.ghi");
     // fs.create_file("abc", 10);
+    fs.create_file("abc", 600);
     // // fs.cat("/root/.def/.ghi/abc");
     // fs.list_dir();
     // fs.sum();
     // fs.change_dir("/root");
     // fs.list_dir();
 
-    // fs._remove(1, -1);
-    fs._remove(0, 4);
+    // // fs._remove(1, -1);
+    // fs._remove(0, 4);
+    // fs.remove("/root", 1);
+    // fs.cat("abc");
+    fs.remove("abc");
+
     fs.list_dir();
     fs.sum();
 
