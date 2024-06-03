@@ -304,7 +304,7 @@ public:
     short double_indirect_block[NUM_DOUBLE_INDIRECT_BLOCK]; // 双重间接地址，占用 2 Byte
                                                             // 总共 41 Byte
     INode()
-        : id(-1), file_type('f'), file_size(BLOCK_SIZE), create_time(0), modify_time(0), link_cnt(0)
+        : id(-1), file_type('f'), file_size(BLOCK_SIZE), create_time(0), modify_time(0), link_cnt(1)
     {
         clear_address();
     }
@@ -465,7 +465,6 @@ public:
         root_inode.file_size = BLOCK_SIZE;
         root_inode.create_time = Util::get_current_time();
         root_inode.modify_time = Util::get_current_time();
-        root_inode.link_cnt = 0;
         root_inode.direct_block[0] = _get_avail_block();
         cout << root_inode;
         _save_inode(root_inode);
@@ -584,8 +583,17 @@ public:
     void _create_blank_dentries(const short &block_id, const short &curr_dir_inode_id, const short &parent_dir_inode_id)
     {
         vector<Dentry> dentry(DENTRY_NUM_PER_BLOCK);
+
         dentry[0] = Dentry(curr_dir_inode_id, ".");
+        INode curr_dir_inode = _get_inode(curr_dir_inode_id);
+        curr_dir_inode.link_cnt++;
+
         dentry[1] = Dentry(parent_dir_inode_id, "..");
+        INode parent_dir_inode = _get_inode(parent_dir_inode_id);
+        parent_dir_inode.link_cnt++;
+
+        _save_inode(curr_dir_inode);
+        _save_inode(parent_dir_inode);
         _dump(dentry.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
     }
 
@@ -1224,7 +1232,6 @@ public:
         new_inode.file_size = filesize_kb * 1024;
         new_inode.create_time = Util::get_current_time();
         new_inode.modify_time = Util::get_current_time();
-        new_inode.link_cnt = 1;
         _set_block_list(new_inode, block_id_list);
 
         cout << "[创建文件] 新 Inode 信息：" << endl;
@@ -1299,7 +1306,6 @@ public:
         new_inode.file_size = BLOCK_SIZE;
         new_inode.create_time = Util::get_current_time();
         new_inode.modify_time = Util::get_current_time();
-        new_inode.link_cnt = 1;
         new_inode.direct_block[0] = new_block_id;
         _create_blank_dentries(new_block_id, new_inode_id, dir_inode_id);
 
@@ -1718,7 +1724,6 @@ public:
     //     //         new_inode.file_size = BLOCK_SIZE;
     //     //         new_inode.create_time = Util::get_current_time();
     //     //         new_inode.modify_time = Util::get_current_time();
-    //     //         new_inode.link_cnt = 0;
     //     //         new_inode.direct_block[0] = _get_avail_block();
 
     //     //         // 创建新的 Dentry
