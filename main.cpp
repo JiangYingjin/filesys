@@ -40,7 +40,7 @@ mkdir   =
 cd      =
 cp
 cat     =
-ls
+ls      =
 sum     =
 */
 
@@ -144,7 +144,7 @@ public:
     }
 
     // 将时间戳转换为字符串
-    static char *time_to_string(int32_t timestamp)
+    static const char *time_to_string(int32_t timestamp)
     {
         time_t t = timestamp;
         struct tm *tm = localtime(&t);
@@ -156,7 +156,7 @@ public:
     }
 
     // 根据文件大小计算需要使用的块数量
-    static int block_occupation(int filesize_kb)
+    static const int block_occupation(int filesize_kb)
     {
         short num_indirect_block = filesize_kb > NUM_DIRECT_BLOCK * BLOCK_SIZE / 1024 ? 1 : 0;
         short num_double_indirect_block = filesize_kb > NUM_DIRECT_BLOCK * BLOCK_SIZE / 1024 + NUM_INDIRECT_BLOCK * ADDRESS_PER_BLOCK * BLOCK_SIZE / 1024 ? 1 : 0;
@@ -165,7 +165,30 @@ public:
         return filesize_kb + num_indirect_block + num_double_indirect_block + num_2nd_indirect_block;
     }
 
-    static void cout_center(string str, int width)
+    static const string readable_size(const int size)
+    {
+        vector<string> suffix = {"", "K", "M"};
+        double _new_size = size;
+        int _suffix_idx = 0;
+
+        while (_new_size > 999)
+        {
+            _new_size /= 1024;
+            _suffix_idx++;
+        }
+
+        stringstream ss;
+        if (_suffix_idx > 0)
+            if (_new_size < 10)
+                ss << fixed << setprecision(1);
+            else
+                ss << fixed << setprecision(0);
+        ss << _new_size;
+
+        return ss.str() + suffix[_suffix_idx];
+    }
+
+    static void cout_center(const string str, const int width)
     {
         if (width < str.size())
         {
@@ -191,11 +214,6 @@ public:
 
     int available_block_num = (FILESYSTEM_SIZE - BLOCK_START) / BLOCK_SIZE; // 可用块的数量
     int available_inode_num = INODE_NUM;                                    // 可用 INode 的数量
-
-    SuperBlock()
-    {
-        // cout << *this;
-    }
 
     friend ostream &operator<<(ostream &os, const SuperBlock &superblock)
     {
@@ -388,44 +406,25 @@ public:
     {
         if (!_is_filesys_exist())
         {
-            cout << "文件系统不存在，创建中 ..." << endl;
+            cout << "[文件系统初始化] 文件系统不存在，创建中 ..." << endl;
             _create_filesys();
-            cout << "文件系统创建成功" << endl;
+            cout << "[文件系统初始化] 文件系统创建成功！" << endl;
         }
         else
         {
-            cout << "文件系统存在，加载中 ..." << endl;
-
-            // 这里载入的数据太多了！！！
+            cout << "[文件系统初始化] 文件系统已存在，加载中 ..." << endl;
             _load(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
             _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
             _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
-
-            // superblock = new SuperBlock();
-            // block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
-            // inode_bitmap = new Bitmap(INODE_BITMAP_SIZE);
-            // _load(superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
-            // _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-            // _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
-
-            cout << "文件系统加载成功" << endl;
+            cout << "[文件系统初始化] 文件系统加载成功！" << endl;
         }
         _init_working_dir();
     }
 
     ~FileSystem()
     {
-        cout << "正在退出文件系统 ..." << endl;
-        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
-        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
-        // _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
-        // _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        // _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
-        // delete superblock;
-        // delete block_bitmap;
-        // delete inode_bitmap;
-        cout << "文件系统退出成功" << endl;
+        _dump_header();
+        cout << "[文件系统退出] 文件系统元数据已保存，退出成功！" << endl;
     }
 
     void _dump(const void *data, int pos, int size)
@@ -459,18 +458,9 @@ public:
         file.close();
         delete[] data;
 
-        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
-        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
+        _dump_header();
 
         _init_root_dir();
-
-        // superblock = new SuperBlock();
-        // block_bitmap = new Bitmap(BLOCK_BITMAP_SIZE);
-        // inode_bitmap = new Bitmap(INODE_BITMAP_SIZE);
-        // _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
-        // _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
-        // _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
     }
 
     // 初始化根目录
@@ -514,6 +504,20 @@ public:
         bool exist = file.good();
         file.close();
         return exist;
+    }
+
+    void _load_header()
+    {
+        _load(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
+        _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
+    }
+
+    void _dump_header()
+    {
+        _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
+        _dump(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
+        _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
     }
 
     // 获取可用块 ID 并在 bitmap 中标记已使用
@@ -925,6 +929,7 @@ public:
                 }
 
             if (!found)
+            {
                 // 找到了次末级目录，但是没有找到最终项（文件/文件夹）
                 // 如果是最后一个，则说明文件不存在，否则说明目录不存在
                 if (&level == &dir_vector.back())
@@ -940,6 +945,8 @@ public:
                     file_inode_id = -1;
                     cout << "[查找 Inode] 目录 " << level << " 不存在" << endl;
                 }
+                return;
+            }
         }
 
         cout << "[查找 Inode] 根据路径查找 Inode 结果：" << endl;
@@ -1099,8 +1106,8 @@ public:
                 if (dentry[i].inode_id != -1)
                 {
                     dentry_list.push_back(dentry[i]);
-                    cout << "[读取目录项] 读取到目录项：" << endl;
-                    cout << dentry[i] << endl;
+                    // cout << "[读取目录项] 读取到目录项：" << endl;
+                    // cout << dentry[i] << endl;
                 }
             }
             delete[] dentry;
@@ -1398,6 +1405,8 @@ public:
 
         if (path.empty())
             _inode_id = working_dir_inode_id;
+        else if (path == "/")
+            _inode_id = ROOT_INODE_ID;
         else
             _search_inode(path, dir_inode_id, _inode_id);
 
@@ -1433,8 +1442,8 @@ public:
                             cout << "文件 ";
                         else
                             cout << "未知 ";
-                        cout << setw(2) << inode.link_cnt << " ";
-                        cout << inode.file_size << " ";
+                        cout << setw(2) << inode.link_cnt << "  ";
+                        cout << setw(4) << Util::readable_size(inode.file_size) << "  ";
                         cout << Util::time_to_string(inode.create_time) << " ";
                         cout << Util::time_to_string(inode.modify_time) << "  ";
                         cout << dentry.get_filename() << endl;
@@ -1893,26 +1902,30 @@ int main(int argc, char *argv[])
     FileSystem fs;
     fs.sum();
 
-    fs._show_bitmap();
-
     // // 创建文件测试
     // fs.create_file("/abc", 600);
-    // fs.sum();
     // fs.create_file("/.abc", 600);
     // fs.create_file("/root/abc", 600);
     // fs.create_file("/root/.abc", 600);
+    // fs.list_dir();
+    // fs.sum();
 
-    // // 创建文件夹简单测试
-    // fs.create_dir("root");
-    // fs.create_dir("root/def");
-    // fs.create_dir("root/.def");
-    // fs.create_dir("root/.def/.ghi");
-    // fs.create_dir("/def");
-    // fs.create_dir("/.def");
-    // // 创建文件 / 文件夹 / 打印文件内容联测
-    // fs.change_dir("root/.def/.ghi");
-    // fs.create_file("abc", 10);
-    // fs.cat("/root/.def/.ghi/abc");
+    // 创建文件夹简单测试
+    fs.create_dir("root");
+    fs.create_dir("root/def");
+    fs.create_dir("root/.def");
+    fs.create_dir("root/.def/.ghi");
+    fs.create_dir("/def");
+    fs.create_dir("/.def");
+    // 创建文件 / 文件夹 / 打印文件内容联测
+    fs.change_dir("root/.def/.ghi");
+    fs.create_file("abc", 10);
+    fs.cat("/root/.def/.ghi/abc");
+    fs.list_dir();
+    fs.sum();
+    fs.change_dir("/root");
+    fs.list_dir();
+    fs.list_dir("/");
 
     // // 打印文件测试
     // fs.cat("/abc");
