@@ -65,6 +65,7 @@ sum     =
 #include <map>
 #include <iomanip>
 #include <cassert>
+#include <memory>
 
 using namespace std;
 
@@ -1112,19 +1113,8 @@ public:
             }
             delete[] dentry;
         }
-
-        // cout << "[读取目录项] 读取到的目录项：" << endl;
-        // for (const auto &dentry : dentry_list)
-        //     cout << dentry << endl;
-        // cout << "[读取目录项] 读取到的目录项数量：" << dentry_list.size() << endl;
-
         return dentry_list;
     }
-
-    // void _load_dentries(const short &inode_id, vector<Dentry> &dentry_list)
-    // {
-    //     _load_dentries(_get_inode(inode_id), dentry_list);
-    // }
 
     vector<Dentry> _load_dentries(short inode_id)
     {
@@ -1157,7 +1147,7 @@ public:
         _dump(inode, INODE_TABLE_START + inode->id * INODE_SIZE, INODE_CLASS_SIZE);
     }
 
-    void _load_file(string *file_data_str, const INode &inode)
+    string _load_file(const INode &inode)
     {
         cout << "[加载文件] 加载如下 INode 的文件内容 ..." << endl;
         cout << inode << endl;
@@ -1169,13 +1159,16 @@ public:
             cout << block_id << " ";
         cout << endl;
 
-        char file_data[inode.file_size + 1];
-        for (int i = 0; i < block_id_list.size(); i++)
-            _load(file_data + i * BLOCK_SIZE, BLOCK_START + block_id_list[i] * BLOCK_SIZE, BLOCK_SIZE);
-        file_data[inode.file_size] = '\0';
-        *file_data_str = file_data;
-        cout << "[加载文件] 文件内容：" << endl;
-        cout << *file_data_str << endl;
+        string file_data_str;
+        file_data_str.reserve(inode.file_size);
+        for (const auto &block_id : block_id_list)
+        {
+            unique_ptr<char[]> block(new char[BLOCK_SIZE]);
+            _load(block.get(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
+            file_data_str.append(block.get(), BLOCK_SIZE);
+        }
+
+        return file_data_str;
     }
 
     // 传入文件路径和文件大小（KB），创建文件
@@ -1355,8 +1348,8 @@ public:
         }
 
         // 读取文件内容
-        string content;
-        _load_file(&content, file_inode);
+        string content = _load_file(file_inode);
+        // _load_file(&content, file_inode);
         cout << "[查看文件内容] 文件 " << absolute_path << " 内容如下：" << endl;
         cout << content << endl;
         cout << "-------------------------" << endl;
@@ -1911,15 +1904,15 @@ int main(int argc, char *argv[])
     // fs.sum();
 
     // 创建文件夹简单测试
-    fs.create_dir("root");
-    fs.create_dir("root/def");
-    fs.create_dir("root/.def");
-    fs.create_dir("root/.def/.ghi");
-    fs.create_dir("/def");
-    fs.create_dir("/.def");
-    // 创建文件 / 文件夹 / 打印文件内容联测
-    fs.change_dir("root/.def/.ghi");
-    fs.create_file("abc", 10);
+    // fs.create_dir("root");
+    // fs.create_dir("root/def");
+    // fs.create_dir("root/.def");
+    // fs.create_dir("root/.def/.ghi");
+    // fs.create_dir("/def");
+    // fs.create_dir("/.def");
+    // // 创建文件 / 文件夹 / 打印文件内容联测
+    // fs.change_dir("root/.def/.ghi");
+    // fs.create_file("abc", 10);
     fs.cat("/root/.def/.ghi/abc");
     fs.list_dir();
     fs.sum();
