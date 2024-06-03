@@ -66,6 +66,8 @@ sum     =
 #include <iomanip>
 #include <cassert>
 #include <memory>
+#include <string_view>
+#include <ranges>
 
 using namespace std;
 
@@ -106,32 +108,18 @@ using namespace std;
 
 #define ROOT_INODE_ID (0)
 
-const map<string, int> FILESYS_INFO = {
-    {"FILESYSTEM_SIZE", FILESYSTEM_SIZE},
-    {"BLOCK_SIZE", BLOCK_SIZE},
-    {"INODE_SIZE", INODE_SIZE},
-    {"BLOCK_NUM", BLOCK_NUM},
-    {"INODE_NUM", INODE_NUM},
-    {"MAX_FILE_SIZE", MAX_FILE_SIZE},
-    {"MAX_FILENAME_SIZE", MAX_FILENAME_SIZE},
-    {"DENTRY_SIZE", DENTRY_SIZE},
-    {"DENTRY_NUM_PER_BLOCK", DENTRY_NUM_PER_BLOCK},
-    {"SUPERBLOCK_SIZE", SUPERBLOCK_SIZE},
-    {"BLOCK_BITMAP_SIZE", BLOCK_BITMAP_SIZE},
-    {"INODE_BITMAP_SIZE", INODE_BITMAP_SIZE},
-    {"INODE_TABLE_SIZE", INODE_TABLE_SIZE},
-    {"SUPERBLOCK_START", SUPERBLOCK_START},
-    {"BLOCK_BITMAP_START", BLOCK_BITMAP_START},
-    {"INODE_BITMAP_START", INODE_BITMAP_START},
-    {"INODE_TABLE_START", INODE_TABLE_START},
-    {"BLOCK_START", BLOCK_START},
-    {"DATA_BLOCK_NUM", DATA_BLOCK_NUM},
-    {"ADDRESS_SIZE", ADDRESS_SIZE},
-    {"ADDRESS_PER_BLOCK", ADDRESS_PER_BLOCK},
-    {"NUM_DIRECT_BLOCK", NUM_DIRECT_BLOCK},
-    {"NUM_INDIRECT_BLOCK", NUM_INDIRECT_BLOCK},
-    {"NUM_DOUBLE_INDIRECT_BLOCK", NUM_DOUBLE_INDIRECT_BLOCK},
-    {"ROOT_INODE_ID", ROOT_INODE_ID}};
+// Vector 输出重载
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec)
+{
+    os << "[ ";
+    for (const T &element : vec)
+    {
+        os << element << " ";
+    }
+    os << "]";
+    return os;
+}
 
 class Util
 {
@@ -760,8 +748,8 @@ public:
                 indirect_block_list.push_back(inode.double_indirect_block[i]);
 
                 // 读取二级间接块
-                Dentry *dentry = new Dentry[DENTRY_NUM_PER_BLOCK];
-                _load(dentry, BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                unique_ptr<Dentry[]> dentry(new Dentry[DENTRY_NUM_PER_BLOCK]);
+                _load(dentry.get(), BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
                 for (int j = 0; j < DENTRY_NUM_PER_BLOCK; j++)
                     if (dentry[j].inode_id != -1)
                         // 将二级中的第二级数据块加入列表
@@ -1318,6 +1306,14 @@ public:
         cout << "[创建目录] 保存 Inode 成功！" << endl;
 
         cout << "[创建目录] 目录 " << absolute_path << " 创建成功" << endl;
+    }
+
+    void _remove(const short &dir_inode_id, const short &file_inode_id)
+    {
+        if (file_inode_id > 0)
+        {
+            // 删除特定文件
+        }
     }
 
     // 读取并打印文件内容
@@ -1878,6 +1874,33 @@ public:
     // 打印所有的宏定义
     static void _show_macros()
     {
+        const map<string, int> FILESYS_INFO = {
+            {"FILESYSTEM_SIZE", FILESYSTEM_SIZE},
+            {"BLOCK_SIZE", BLOCK_SIZE},
+            {"INODE_SIZE", INODE_SIZE},
+            {"BLOCK_NUM", BLOCK_NUM},
+            {"INODE_NUM", INODE_NUM},
+            {"MAX_FILE_SIZE", MAX_FILE_SIZE},
+            {"MAX_FILENAME_SIZE", MAX_FILENAME_SIZE},
+            {"DENTRY_SIZE", DENTRY_SIZE},
+            {"DENTRY_NUM_PER_BLOCK", DENTRY_NUM_PER_BLOCK},
+            {"SUPERBLOCK_SIZE", SUPERBLOCK_SIZE},
+            {"BLOCK_BITMAP_SIZE", BLOCK_BITMAP_SIZE},
+            {"INODE_BITMAP_SIZE", INODE_BITMAP_SIZE},
+            {"INODE_TABLE_SIZE", INODE_TABLE_SIZE},
+            {"SUPERBLOCK_START", SUPERBLOCK_START},
+            {"BLOCK_BITMAP_START", BLOCK_BITMAP_START},
+            {"INODE_BITMAP_START", INODE_BITMAP_START},
+            {"INODE_TABLE_START", INODE_TABLE_START},
+            {"BLOCK_START", BLOCK_START},
+            {"DATA_BLOCK_NUM", DATA_BLOCK_NUM},
+            {"ADDRESS_SIZE", ADDRESS_SIZE},
+            {"ADDRESS_PER_BLOCK", ADDRESS_PER_BLOCK},
+            {"NUM_DIRECT_BLOCK", NUM_DIRECT_BLOCK},
+            {"NUM_INDIRECT_BLOCK", NUM_INDIRECT_BLOCK},
+            {"NUM_DOUBLE_INDIRECT_BLOCK", NUM_DOUBLE_INDIRECT_BLOCK},
+            {"ROOT_INODE_ID", ROOT_INODE_ID}};
+
         cout << "----------- 文件系统预定义常量 -----------" << endl;
         for (const auto &pair : FILESYS_INFO)
         {
@@ -1887,6 +1910,23 @@ public:
         cout << "------------------------------------------" << endl;
     }
 };
+
+// void _input()
+// {
+//     string input;
+//     cout << "Please enter your input: ";
+//     getline(cin, input);
+
+//     // 使用 string_view 来查看输入字符串
+//     string_view inputView(input);
+//     // 使用 ranges::split 来拆分字符串
+//     auto words = inputView | std::views::split(' ') | std::views::transform([](auto &&range)
+//                                                                   { return string(range.begin(), range.end()); });
+
+//     // 输出拆分后的单词
+//     for (const auto &word : words)
+//         cout << word << endl;
+// }
 
 int main(int argc, char *argv[])
 {
@@ -1913,12 +1953,16 @@ int main(int argc, char *argv[])
     // // 创建文件 / 文件夹 / 打印文件内容联测
     // fs.change_dir("root/.def/.ghi");
     // fs.create_file("abc", 10);
-    fs.cat("/root/.def/.ghi/abc");
-    fs.list_dir();
-    fs.sum();
+    // fs.cat("/root/.def/.ghi/abc");
+    // fs.list_dir();
+    // fs.sum();
     fs.change_dir("/root");
-    fs.list_dir();
-    fs.list_dir("/");
+    fs.change_dir("/root/.def");
+    fs.change_dir("/root/.def/.ghi");
+    fs.change_dir("/root/.def/.ghi/abc");
+    fs.change_dir("/root/.def/.ghi/xxx");
+    // fs.list_dir();
+    // fs.list_dir("/");
 
     // // 打印文件测试
     // fs.cat("/abc");
@@ -1957,13 +2001,6 @@ int main(int argc, char *argv[])
     // for (int i = 1; i <= 10; i++)
     //     fs.create_file("/f" + to_string(i), 1);
     // fs.list_dir();
-
-    // // 打印 block_bitmap 的大小
-    // printf("Block bitmap size: %d\n", BLOCK_BITMAP_SIZE); // 2048
-    // // 打印 inode_bitmap 的大小
-    // printf("INode bitmap size: %d\n", INODE_BITMAP_SIZE); // 1024
-    // // 打印时间测试
-    // cout << fs.time_to_string(fs.get_current_time()) << endl;
 
     return 0;
 }
