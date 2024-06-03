@@ -304,7 +304,7 @@ public:
     short double_indirect_block[NUM_DOUBLE_INDIRECT_BLOCK]; // 双重间接地址，占用 2 Byte
                                                             // 总共 41 Byte
     INode()
-        : id(-1), file_type('f'), file_size(BLOCK_SIZE), create_time(0), modify_time(0), link_cnt(1)
+        : id(-1), file_type('f'), file_size(BLOCK_SIZE), create_time(0), modify_time(0), link_cnt(0)
     {
         clear_address();
     }
@@ -324,7 +324,7 @@ public:
         os << "文件大小：\t" << inode.file_size << " 字节" << endl;
         os << "创建时间：\t" << Util::time_to_string(inode.create_time) << endl;
         os << "修改时间：\t" << Util::time_to_string(inode.modify_time) << endl;
-        os << "链接数：\t" << inode.link_cnt << endl;
+        os << "硬链接数：\t" << inode.link_cnt << endl;
 
         os << "直接块：\t";
         for (int i = 0; i < NUM_DIRECT_BLOCK; i++)
@@ -455,7 +455,7 @@ public:
     // 初始化根目录
     void _init_root_dir()
     {
-        cout << "初始化根目录 ..." << endl;
+        cout << "[初始化根目录] 准备初始化 ..." << endl;
 
         // Inode
         INode root_inode = INode();
@@ -465,9 +465,11 @@ public:
         root_inode.file_size = BLOCK_SIZE;
         root_inode.create_time = Util::get_current_time();
         root_inode.modify_time = Util::get_current_time();
+        root_inode.link_cnt = 0;
         root_inode.direct_block[0] = _get_avail_block();
-        cout << root_inode;
         _save_inode(root_inode);
+
+        // Superblock
         _dump(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
 
         // 数据块
@@ -476,7 +478,8 @@ public:
         // Bitmap
         inode_bitmap.set(ROOT_INODE_ID);
         _dump(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
-        // _show_bitmap();
+
+        cout << "[初始化根目录] 初始化完成！" << endl;
     }
 
     void _init_working_dir()
@@ -587,6 +590,7 @@ public:
         dentry[0] = Dentry(curr_dir_inode_id, ".");
         INode curr_dir_inode = _get_inode(curr_dir_inode_id);
         curr_dir_inode.link_cnt++;
+        _save_inode(curr_dir_inode);
         // cout << "[创建空 Dentry 数据块] Curr Dir INode ID：" << curr_dir_inode_id << endl
         //      << curr_dir_inode << endl;
         // cout << "[创建空 Dentry 数据块] INode 0：" << endl
@@ -595,19 +599,12 @@ public:
         dentry[1] = Dentry(parent_dir_inode_id, "..");
         INode parent_dir_inode = _get_inode(parent_dir_inode_id);
         parent_dir_inode.link_cnt++;
+        _save_inode(parent_dir_inode);
         // cout << "[创建空 Dentry 数据块] Parent Dir INode ID：" << parent_dir_inode_id << endl
         //      << parent_dir_inode << endl;
         // cout << "[创建空 Dentry 数据块] INode 0：" << endl
         //      << _get_inode(0) << endl;
 
-        _save_inode(curr_dir_inode);
-        _save_inode(parent_dir_inode);
-        // cout << "[创建空 Dentry 数据块] 当前目录 INode：" << endl
-        //      << curr_dir_inode << endl;
-        // cout << "[创建空 Dentry 数据块] 父目录 INode：" << endl
-        //      << parent_dir_inode << endl;
-        // cout << "[创建空 Dentry 数据块] INode 0：" << endl
-        //      << _get_inode(0) << endl;
         _dump(dentry.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
     }
 
@@ -1259,6 +1256,7 @@ public:
         new_inode.file_size = filesize_kb * 1024;
         new_inode.create_time = Util::get_current_time();
         new_inode.modify_time = Util::get_current_time();
+        new_inode.link_cnt = 1;
         _set_block_list(new_inode, block_id_list);
 
         cout << "[创建文件] 新 Inode 信息：" << endl;
@@ -1333,6 +1331,7 @@ public:
         new_inode.file_size = BLOCK_SIZE;
         new_inode.create_time = Util::get_current_time();
         new_inode.modify_time = Util::get_current_time();
+        new_inode.link_cnt = 1;
         new_inode.direct_block[0] = new_block_id;
         _save_inode(new_inode);
         _create_blank_dentries(new_block_id, new_inode_id, dir_inode_id);
@@ -2051,27 +2050,22 @@ int main(int argc, char *argv[])
     // fs.create_file("/.abc", 600);
     // fs.create_file("/root/abc", 600);
     // fs.create_file("/root/.abc", 600);
-    // fs.list_dir();
+    fs.list_dir();
     // fs.sum();
-
-    cout << fs._get_inode(0);
 
     // // 创建文件夹简单测试
     fs.create_dir("root");
-    cout << fs._get_inode(0);
     fs.create_dir("root/def");
-    cout << fs._get_inode(0);
     fs.create_dir("root/.def");
-    cout << fs._get_inode(0);
     // fs.create_dir("root/.def/.ghi");
     // fs.create_dir("/def");
     // fs.create_dir("/.def");
     // // 创建文件 / 文件夹 / 打印文件内容联测
     // fs.change_dir("root/.def/.ghi");
-    // fs.create_file("abc", 10);
+    fs.create_file("abc", 10);
     // fs.cat("/root/.def/.ghi/abc");
-    // fs.list_dir();
-    // fs.sum();
+    fs.list_dir();
+    fs.sum();
     // fs.change_dir("/root");
     // fs.change_dir("/root/.def");
     // fs.change_dir("/root/.def/.ghi");
