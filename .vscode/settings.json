@@ -76,6 +76,9 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "map": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "unordered_set": "cpp",
+        "list": "cpp",
+        "source_location": "cpp"
     }
 }

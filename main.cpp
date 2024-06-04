@@ -33,12 +33,12 @@ j)打印文件内容：cat
 k)您不需要实现 Login 的功能！
 5.加载和退出：退出程序并释放所有占用的内存，但内存的内容应保存在磁盘上，以便重新加载；
 
-rm
-rm -r
+rm      =
+rm -r   =
 touch   =
 mkdir   =
 cd      =
-cp
+cp      =
 cat     =
 ls      =
 sum     =
@@ -71,6 +71,7 @@ sum     =
 #include <ranges>
 #include <unordered_set>
 #include <numeric>
+#include <boost/algorithm/string.hpp>
 
 using namespace std;
 
@@ -1948,10 +1949,19 @@ public:
 
 int main(int argc, char *argv[])
 {
-    FileSystem::_show_macros();
-
     FileSystem fs;
-    fs.sum();
+
+    string user_input;
+    vector<string> input_vec;
+    while (true)
+    {
+        cout << fs.working_dir << " > ";
+        getline(cin, user_input);
+        boost::split(input_vec, user_input, boost::is_space(), boost::token_compress_on);
+
+        cout << user_input << endl;
+        cout << input_vec << endl;
+    }
 
     // // 创建文件测试
     // fs.create_file("/abc", 600);
@@ -2006,8 +2016,8 @@ int main(int argc, char *argv[])
 
     // fs.copy("root", "root-copy2",1);
 
-    fs.list_dir();
-    fs.sum();
+    // fs.list_dir();
+    // fs.sum();
 
     // string test_str = "123456789";
     // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
