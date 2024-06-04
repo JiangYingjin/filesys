@@ -905,6 +905,22 @@ public:
         return dir_vector;
     }
 
+    short _search_inode(const short &dir_inode_id, const string &filename)
+    {
+        cout << "[查找 Inode] 正在如下 INode 中查找目录项 " << filename << " ..." << endl;
+        cout << _get_inode(dir_inode_id);
+
+        vector<Dentry> dentry_list = _load_dentries(dir_inode_id);
+        for (const auto &dentry : dentry_list)
+            if (dentry.filename == filename)
+            {
+                cout << "[查找 Inode] 找到目录项 " << filename << "（inode_id: " << dentry.inode_id << "）" << endl;
+                return dentry.inode_id;
+            }
+
+        return -1;
+    }
+
     void _search_inode(const string path, short &dir_inode_id, short &file_inode_id)
     {
         cout << "[查找 Inode] 根据路径 " << path << " 查找 Inode ..." << endl;
@@ -1357,7 +1373,7 @@ public:
     }
 
     // 传入文件路径和文件大小（KB），创建文件
-    void create_file(const string path, int filesize_kb)
+    void create_file(const string &path, const unsigned short &filesize_kb)
     {
         // 将路径转为绝对路径
         string absolute_path = _absolute_path(path);
@@ -1422,29 +1438,12 @@ public:
         return new_inode_id;
     }
 
-    void create_dir(const string path)
+    void create_dir(const string path, bool parent = false)
     {
         // 将路径转为绝对路径
         string absolute_path = _absolute_path(path);
 
         cout << "[创建目录] 准备创建 " << absolute_path << " ..." << endl;
-
-        // 根据路径查找 Inode
-        short dir_inode_id, file_inode_id;
-        _search_inode(path, dir_inode_id, file_inode_id);
-
-        if (dir_inode_id == -1)
-        {
-            cout << "[创建目录] 路径 " << absolute_path << " 无效" << endl;
-            return;
-        }
-
-        // 如果 file_inode_id 不为 -1，则说明文件已存在
-        if (file_inode_id != -1)
-        {
-            cout << "[创建目录] 文件 " << absolute_path << " 已存在" << endl;
-            return;
-        }
 
         if (superblock.available_inode_num == 0)
         {
@@ -1452,13 +1451,51 @@ public:
             return;
         }
 
-        if (superblock.available_block_num < 1)
+        if (superblock.available_block_num == 0)
         {
             cout << "[创建目录] 可用块不足，目录创建失败！" << endl;
             return;
         }
 
-        short new_inode_id = _create_dir(dir_inode_id, _filename(path));
+        // 根据路径查找 Inode
+        short dir_inode_id, file_inode_id;
+        _search_inode(path, dir_inode_id, file_inode_id);
+
+        // 如果 file_inode_id 不为 -1，则说明文件已存在
+        if (file_inode_id != -1)
+        {
+            cout << "[创建目录] " << absolute_path << " 已存在" << endl;
+            return;
+        }
+
+        short new_inode_id;
+        if (!parent)
+        {
+            if (dir_inode_id == -1)
+            {
+                cout << "[创建目录] 路径 " << absolute_path << " 无效" << endl;
+                return;
+            }
+
+            new_inode_id = _create_dir(dir_inode_id, _filename(path));
+        }
+
+        else if (parent)
+        {
+            vector<string> dir_vector = _split_path(absolute_path);
+            short _dir_inode_id = ROOT_INODE_ID;
+            short _ptr_inode_id;
+            for (const auto &level : dir_vector)
+            {
+                _ptr_inode_id = _search_inode(_dir_inode_id, level);
+
+                if (_ptr_inode_id == -1)
+                    _ptr_inode_id = _create_dir(_dir_inode_id, level);
+
+                _dir_inode_id = _ptr_inode_id;
+            }
+            new_inode_id = _ptr_inode_id;
+        }
 
         cout << "[创建目录] 新 Inode 信息：" << endl;
         cout << _get_inode(new_inode_id) << endl;
@@ -1553,6 +1590,12 @@ public:
         if (absolute_path == "/")
         {
             cout << "[删除文件/目录] 根目录不可删除" << endl;
+            return;
+        }
+
+        if (absolute_path == working_dir)
+        {
+            cout << "[删除文件/目录] 当前工作目录不可删除" << endl;
             return;
         }
 
@@ -1959,8 +2002,128 @@ int main(int argc, char *argv[])
         getline(cin, user_input);
         boost::split(input_vec, user_input, boost::is_space(), boost::token_compress_on);
 
-        cout << user_input << endl;
-        cout << input_vec << endl;
+        // cout << user_input << endl;
+        // cout << input_vec << endl;
+
+        // TODO
+        if (input_vec.size() > 0)
+        {
+            // l / ls
+            if (input_vec[0] == "l" || input_vec[0] == "ls")
+                fs.list_dir();
+
+            // cd
+            else if (input_vec[0] == "cd")
+            {
+                if (input_vec.size() < 2)
+                    ;
+                else if (input_vec.size() > 2)
+                    cout << "cd: too many arguments" << endl;
+                else
+                    fs.change_dir(input_vec[1]);
+            }
+
+            // sum
+            else if (input_vec[0] == "sum")
+                fs.sum();
+
+            // cat
+            else if (input_vec[0] == "cat")
+            {
+                if (input_vec.size() != 2)
+                    cout << "cat: invalid arguments" << endl
+                         << "Usage: cat [filename]" << endl;
+                else
+                    fs.cat(input_vec[1]);
+            }
+
+            // touch
+            else if (input_vec[0] == "touch" || input_vec[0] == "createFile")
+            {
+                if (input_vec.size() != 3)
+                    cout << input_vec[0] << ": invalid arguments" << endl
+                         << "Usage: touch [filename] [filesize_kb]" << endl;
+                else
+                {
+                    try
+                    {
+                        const short filesize_kb = stoi(input_vec[2]);
+                        if (filesize_kb < 0)
+                            cout << input_vec[0] << ": invalid filesize" << endl
+                                 << "Usage: touch [filename] [filesize_kb]" << endl;
+                        else
+                            fs.create_file(input_vec[1], filesize_kb);
+                    }
+                    catch (const std::exception &e)
+                    {
+                        cout << input_vec[0] << ": invalid filesize" << endl
+                             << "Usage: touch [filename] [filesize_kb]" << endl;
+                    }
+                }
+            }
+
+            // mkdir
+            else if (input_vec[0] == "mkdir" || input_vec[0] == "createDir")
+            {
+                if (input_vec.size() < 2)
+                    // 可以允许多个 dirname 参数
+                    cout << input_vec[0] << ": invalid arguments" << endl
+                         << "Usage: mkdir [dirname1] [dirname2] ..." << endl;
+                else
+                    for (int i = 1; i < input_vec.size(); i++)
+                        fs.create_dir(input_vec[i], 1);
+            }
+
+            // rm
+            else if (input_vec[0] == "rm")
+            {
+                // 允许多个文件/目录参数，能够检测 -r 参数
+                if (input_vec.size() < 2)
+                    cout << input_vec[0] << ": invalid arguments" << endl
+                         << "Usage: rm [-r] [filename1] [filename2] ..." << endl;
+                else
+                {
+                    bool recursive = false;
+                    for (const auto &input : input_vec)
+                        if (input[0] == '-' && boost::algorithm::contains(input, "r"))
+                        {
+                            recursive = true;
+                            input_vec.erase(std::remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
+                        }
+
+                    for (int i = 1; i < input_vec.size(); i++)
+                        fs.remove(input_vec[i], recursive);
+                }
+            }
+
+            // cp
+            else if (input_vec[0] == "cp")
+            {
+                // 允许多个文件/目录参数，能够检测 -r 参数
+                if (input_vec.size() < 3)
+                    cout << input_vec[0] << ": invalid arguments" << endl
+                         << "Usage: cp [-r] [src] [dst]" << endl;
+                else
+                {
+                    bool recursive = false;
+                    for (const auto &input : input_vec)
+                        if (input[0] == '-' && boost::algorithm::contains(input, "r"))
+                        {
+                            recursive = true;
+                            input_vec.erase(std::remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
+                        }
+
+                    fs.copy(input_vec[1], input_vec[2], recursive);
+                }
+            }
+
+            // sum
+            else if (input_vec[0] == "sum")
+                fs.sum();
+
+            else
+                cout << "command not found: " << input_vec[0] << endl;
+        }
     }
 
     // // 创建文件测试
