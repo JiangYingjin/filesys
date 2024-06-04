@@ -69,6 +69,8 @@ sum     =
 #include <memory>
 #include <string_view>
 #include <ranges>
+#include <unordered_set>
+#include <numeric>
 
 using namespace std;
 
@@ -1204,6 +1206,79 @@ public:
         return inode;
     }
 
+    const vector<short> _inode_cnt(const short &inode_id)
+    {
+        vector<short> cnt;
+        const INode inode = _get_inode(inode_id);
+
+        // 文件
+        if (inode.file_type != 'd')
+            cnt.push_back(inode.id);
+
+        else if (inode.file_type == 'd')
+        {
+            cnt.push_back(inode.id);
+            vector<Dentry> dentry_list = _load_dentries(inode);
+            for (const auto &dentry : dentry_list)
+                if (dentry.inode_id != -1 && dentry.get_filename() != "." && dentry.get_filename() != "..")
+                {
+                    vector<short> temp = _inode_cnt(dentry.inode_id);
+                    cnt.insert(cnt.end(), temp.begin(), temp.end());
+                }
+        }
+
+        return cnt;
+    }
+
+    const short inode_cnt(const short &inode_id)
+    {
+        cout << "[统计 Inode 数量] 正在统计 " << inode_id << " 的占用总 Inode 数 ..." << endl;
+        vector<short> cnt = _inode_cnt(inode_id);
+        cout << "[统计 Inode 数量] INode 列表: " << cnt << endl;
+        unordered_set<short> unique_cnt(cnt.begin(), cnt.end());
+        short sum = 0;
+        for (const auto &id : unique_cnt)
+            sum++;
+        cout << "[统计 Inode 数量] INode 数量: " << sum << endl;
+        return sum;
+    }
+
+    const short block_cnt(const short &inode_id)
+    {
+        cout << "[统计块数量] 正在统计 " << inode_id << " 的占用总块数 ..." << endl;
+
+        short cnt = 0;
+        const INode inode = _get_inode(inode_id);
+
+        if (inode.file_type != 'd')
+        {
+            // 数据块
+            vector<short> block_id_list = _get_block_list(inode);
+            // 间接地址块
+            vector<short> addr_block_id_list = _get_addr_block_list(inode);
+
+            cnt = block_id_list.size() + addr_block_id_list.size();
+        }
+        else if (inode.file_type == 'd')
+        {
+            // 数据块（Dentry 数据块）
+            vector<short> block_id_list = _get_block_list(inode);
+            // 间接地址块
+            vector<short> addr_block_id_list = _get_addr_block_list(inode);
+
+            cnt = block_id_list.size() + addr_block_id_list.size();
+
+            // 该目录下文件/文件夹占用的块数
+            vector<Dentry> dentry_list = _load_dentries(inode);
+            for (const auto &dentry : dentry_list)
+                if (dentry.inode_id != -1 && dentry.get_filename() != "." && dentry.get_filename() != "..")
+                    cnt += block_cnt(dentry.inode_id);
+        }
+
+        cout << "[统计块数量] INode " << inode_id << " 占用总块数：" << cnt << endl;
+        return cnt;
+    }
+
     string _load_file(const INode &inode)
     {
         cout << "[加载文件] 加载如下 INode 的文件内容 ..." << endl;
@@ -1551,6 +1626,50 @@ public:
         }
     }
 
+    void copy(const string &src_path, const string &dst_path)
+    {
+        // 将路径转为绝对路径
+        string absolute_src_path = _absolute_path(src_path);
+        string absolute_dst_path = _absolute_path(dst_path);
+
+        cout << "[复制文件/目录] 准备复制 " << absolute_src_path << " 到 " << absolute_dst_path << " ..." << endl;
+
+        // 根据路径查找 Inode
+        short src_dir_inode_id, src_file_inode_id;
+        _search_inode(src_path, src_dir_inode_id, src_file_inode_id);
+
+        short dst_dir_inode_id, dst_file_inode_id;
+        _search_inode(dst_path, dst_dir_inode_id, dst_file_inode_id);
+
+        if (src_file_inode_id == -1)
+        {
+            cout << "[复制文件/目录] 源文件/目录 " << absolute_src_path << " 不存在" << endl;
+            return;
+        }
+
+        if (dst_file_inode_id != -1)
+        {
+            cout << "[复制文件/目录] 目标文件/目录 " << absolute_dst_path << " 已存在" << endl;
+            return;
+        }
+
+        if (superblock.available_inode_num == 0)
+        {
+            cout << "[复制文件/目录] 可用 Inode 不足，复制失败！" << endl;
+            return;
+        }
+
+        if (superblock.available_block_num < 1)
+        {
+            cout << "[复制文件/目录] 可用块不足，复制失败！" << endl;
+            return;
+        }
+
+        _copy(src_file_inode_id, dst_dir_inode_id, _filename(dst_path));
+
+        cout << "[复制文件/目录] 文件/目录 " << absolute_src_path << " 已复制到 " << absolute_dst_path << endl;
+    }
+
     // 读取并打印文件内容
     void cat(const string &path)
     {
@@ -1824,10 +1943,12 @@ int main(int argc, char *argv[])
     fs.list_dir();
     fs.sum();
 
+    fs.block_cnt(0);
+
     // fs.remove("abc");
 
-    // fs.list_dir();
-    // fs.sum();
+    fs.list_dir();
+    fs.sum();
 
     // string test_str = "123456789";
     // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
