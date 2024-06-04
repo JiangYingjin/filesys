@@ -920,6 +920,16 @@ public:
         {
             // 获取当前目录级别的数据块
             // cout << "[查找 Inode] 当前目录级别：" << level << endl;
+
+            // 如果非最后一级的 level 不是目录
+            if (_get_inode(ptr_inode_id).file_type != 'd' && &level != &dir_vector.back())
+            {
+                cout << "[查找 Inode] 当前目录级别不是目录，查找失败！" << endl;
+                dir_inode_id = -1;
+                file_inode_id = -1;
+                return;
+            }
+
             vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
 
             // cout << "[查找 Inode] 当前目录项：" << endl;
@@ -1626,7 +1636,7 @@ public:
         }
     }
 
-    void copy(const string &src_path, const string &dst_path)
+    void copy(const string &src_path, const string &dst_path, bool recursive = false)
     {
         // 将路径转为绝对路径
         string absolute_src_path = _absolute_path(src_path);
@@ -1647,21 +1657,27 @@ public:
             return;
         }
 
-        if (dst_file_inode_id != -1)
+        const INode dst_file_inode = _get_inode(dst_file_inode_id);
+
+        if (dst_file_inode_id != -1 && dst_file_inode.file_type == 'f')
         {
             cout << "[复制文件/目录] 目标文件/目录 " << absolute_dst_path << " 已存在" << endl;
             return;
         }
 
-        if (superblock.available_inode_num == 0)
+        const short src_inode_cnt = inode_cnt(src_file_inode_id);
+
+        if (superblock.available_inode_num < src_inode_cnt)
         {
-            cout << "[复制文件/目录] 可用 Inode 不足，复制失败！" << endl;
+            cout << "[复制文件/目录] 可用 Inode 不足，复制失败！源文件/目录占用 " << src_inode_cnt << " 个 Inode，目前可用 Inode 剩余 " << superblock.available_inode_num << " 个" << endl;
             return;
         }
 
-        if (superblock.available_block_num < 1)
+        const short src_block_cnt = block_cnt(src_file_inode_id);
+
+        if (superblock.available_block_num < src_block_cnt)
         {
-            cout << "[复制文件/目录] 可用块不足，复制失败！" << endl;
+            cout << "[复制文件/目录] 可用块不足，复制失败！源文件/目录占用 " << src_block_cnt << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
             return;
         }
 
@@ -1940,7 +1956,7 @@ int main(int argc, char *argv[])
     // fs.remove("large-random-copy");
     // fs._copy(5, 0, "large-random-copy");
     // fs.cat("large-random-copy");
-    fs.list_dir();
+    // fs.list_dir("u/x");
     fs.sum();
 
     fs.block_cnt(0);
