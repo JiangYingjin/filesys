@@ -1657,11 +1657,18 @@ public:
             return;
         }
 
-        const INode dst_file_inode = _get_inode(dst_file_inode_id);
+        const INode src_file_inode = _get_inode(src_file_inode_id);
 
-        if (dst_file_inode_id != -1 && dst_file_inode.file_type == 'f')
+        if (dst_dir_inode_id == -1)
         {
-            cout << "[复制文件/目录] 目标文件/目录 " << absolute_dst_path << " 已存在" << endl;
+            cout << "[复制文件/目录] 目标路径 " << absolute_dst_path << " 有误" << endl;
+            return;
+        }
+
+        if (dst_file_inode_id > 0 && _get_inode(dst_file_inode_id).file_type == 'f')
+        {
+            cout << "[复制文件/目录] 目标文件/目录 " << absolute_dst_path << " 已存在，其 INode 如下：" << endl;
+            cout << _get_inode(dst_file_inode_id);
             return;
         }
 
@@ -1681,9 +1688,45 @@ public:
             return;
         }
 
-        _copy(src_file_inode_id, dst_dir_inode_id, _filename(dst_path));
+        if (src_file_inode.file_type == 'f')
+        {
+            if (dst_file_inode_id == -1)
+            {
+                cout << "[复制文件/目录] 准备将源文件 " << absolute_src_path << " 复制到目标路径 " << absolute_dst_path << " ..." << endl;
+                _copy(src_file_inode_id, dst_dir_inode_id, _filename(dst_path));
+            }
 
-        cout << "[复制文件/目录] 文件/目录 " << absolute_src_path << " 已复制到 " << absolute_dst_path << endl;
+            else if (_get_inode(dst_file_inode_id).file_type == 'd')
+            {
+                cout << "[复制文件/目录] 准备将源文件 " << absolute_src_path << " 复制到目标路径 " << absolute_dst_path + "/" + _filename(src_path) << " ..." << endl;
+                _copy(src_file_inode_id, dst_file_inode_id, _filename(src_path));
+            }
+        }
+
+        else if (src_file_inode.file_type == 'd')
+        {
+            if (!recursive)
+            {
+                cout << "[复制文件/目录] 无法复制目录 " << absolute_src_path << "，如需复制，请使用 cp -r" << endl;
+                return;
+            }
+            else if (recursive)
+            {
+                if (dst_file_inode_id == -1)
+                {
+                    cout << "[复制文件/目录] 准备将源文件 " << absolute_src_path << " 复制到目标路径 " << absolute_dst_path << " ..." << endl;
+                    _copy(src_file_inode_id, dst_dir_inode_id, _filename(dst_path));
+                }
+
+                else if (_get_inode(dst_file_inode_id).file_type == 'd')
+                {
+                    cout << "[复制文件/目录] 准备将源文件 " << absolute_src_path << " 复制到目标路径 " << absolute_dst_path + "/" + _filename(src_path) << " ..." << endl;
+                    _copy(src_file_inode_id, dst_file_inode_id, _filename(src_path));
+                }
+            }
+        }
+
+        cout << "[复制文件/目录] 文件/目录 " << absolute_src_path << " 已成功复制到 " << absolute_dst_path << endl;
     }
 
     // 读取并打印文件内容
@@ -1957,11 +2000,11 @@ int main(int argc, char *argv[])
     // fs._copy(5, 0, "large-random-copy");
     // fs.cat("large-random-copy");
     // fs.list_dir("u/x");
-    fs.sum();
 
-    fs.block_cnt(0);
-
+    // fs.block_cnt(0);
     // fs.remove("abc");
+
+    // fs.copy("root", "root-copy2",1);
 
     fs.list_dir();
     fs.sum();
