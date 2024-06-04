@@ -64,6 +64,7 @@ sum     =
 #include <regex>
 #include <map>
 #include <iomanip>
+#include <cstdlib>
 #include <cassert>
 #include <memory>
 #include <string_view>
@@ -1254,12 +1255,13 @@ public:
         _set_block_list(new_inode_id, block_id_list);
 
         // 向数据块写入随机内容
+        srand(static_cast<unsigned int>(time(0)));
         for (const auto &id : block_id_list)
         {
             vector<char> content(BLOCK_SIZE);
             for (int i = 0; i < BLOCK_SIZE; i++)
-                // content[i] = 'a' + rand() % 26;
-                content[i] = '0' + i % 10;
+                content[i] = 'a' + rand() % 26;
+            // content[i] = '0' + i % 10;
             // cout << "[创建文件] 写入数据块 " << id << " 内容：" << endl
             //      << content << endl;
             _dump(content.data(), BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
@@ -1509,39 +1511,45 @@ public:
         }
     }
 
-    // void _copy(const short &src_dir_inode_id, const short &src_inode_id, const short &dst_dir_inode_id, const string &dst_filename)
-    // {
-    //     // 假设已经完成了一切检查，此函数仅作执行操作
-    //     if (_get_inode(src_inode_id).file_type == 'f')
-    //     {
-    //         // 创建文件
-    //         create_file(_absolute_path(dst_filename), _get_inode(src_inode_id).file_size / 1024);
-    //         short dst_inode_id;
-    //         _search_inode(dst_filename, dst_dir_inode_id, dst_inode_id);
-    //         vector<short> src_block_list = _get_block_list(src_inode_id);
-    //         vector<short> dst_block_list = _get_block_list(dst_inode_id);
-    //         for (int i = 0; i < src_block_list.size(); i++)
-    //         {
-    //             _dump(BLOCK_START + dst_block_list[i] * BLOCK_SIZE, BLOCK_START + src_block_list[i] * BLOCK_SIZE, BLOCK_SIZE);
-    //         }
-    //     }
-    //     else if (_get_inode(src_inode_id).file_type == 'd')
-    //     {
-    //         // 创建目录
-    //         create_dir(_absolute_path(dst_filename));
-    //         short dst_inode_id;
-    //         _search_inode(dst_filename, dst_dir_inode_id, dst_inode_id);
-    //         vector<Dentry> src_dentry_list = _load_dentries(src_inode_id);
-    //         vector<Dentry> dst_dentry_list = _load_dentries(dst_inode_id);
-    //         for (int i = 0; i < src_dentry_list.size(); i++)
-    //         {
-    //             if (src_dentry_list[i].inode_id != -1)
-    //             {
-    //                 _copy(src_inode_id, src_dentry_list[i].inode_id, dst_inode_id, src_dentry_list[i].get_filename());
-    //             }
-    //         }
-    //     }
-    // }
+    void _copy(const short &src_inode_id, const short &dst_dir_inode_id, const string &dst_filename)
+    {
+        // 假设已经完成了一切检查，此函数仅作执行操作
+        const INode src_inode = _get_inode(src_inode_id);
+        cout << "[复制文件/目录] 正在复制文件/目录 " << src_inode_id << " 到目录 " << dst_dir_inode_id << "，目标文件名为 " << dst_filename << " ..." << endl;
+        cout << "[复制文件/目录] 源文件/目录信息：" << endl;
+        cout << src_inode;
+        cout << "[复制文件/目录] 目标目录信息：" << endl;
+        cout << _get_inode(dst_dir_inode_id);
+
+        if (src_inode.file_type == 'f')
+        {
+            // 新建指定名称的文件
+            short new_inode_id = _create_file(dst_dir_inode_id, dst_filename, src_inode.file_size / 1024);
+
+            // 复制数据块
+            vector<short> src_block_id_list = _get_block_list(src_inode_id);
+            vector<short> dst_block_id_list = _get_block_list(new_inode_id);
+            for (int i = 0; i < src_block_id_list.size(); i++)
+            {
+                vector<char> content(BLOCK_SIZE);
+                _load(content.data(), BLOCK_START + src_block_id_list[i] * BLOCK_SIZE, BLOCK_SIZE);
+                _dump(content.data(), BLOCK_START + dst_block_id_list[i] * BLOCK_SIZE, BLOCK_SIZE);
+            }
+        }
+        else if (src_inode.file_type == 'd')
+        {
+            cout << "[复制文件/目录] 准备迭代复制目录下的文件/目录 ..." << endl;
+
+            // 新建指定名称的目录
+            short new_inode_id = _create_dir(dst_dir_inode_id, dst_filename);
+
+            // 递归复制源文件夹下的文件
+            vector<Dentry> dentry_list = _load_dentries(src_inode_id);
+            for (const auto &dentry : dentry_list)
+                if (dentry.inode_id != -1 && dentry.get_filename() != "." && dentry.get_filename() != "..")
+                    _copy(dentry.inode_id, new_inode_id, dentry.get_filename());
+        }
+    }
 
     // 读取并打印文件内容
     void cat(const string &path)
@@ -1775,11 +1783,16 @@ int main(int argc, char *argv[])
     // fs.list_dir();
     // fs.sum();
 
-    // // // 创建文件夹简单测试
+    // fs._copy(7, 0, "root-copy");
+    // fs.cat("root-copy/def/abc");
+    // fs.list_dir("root-copy/def");
+
+    // // // // 创建文件夹简单测试
     // fs.create_dir("root");
-    // fs.remove("root", 1);
-    // fs.list_dir();
+    // // fs.remove("root", 1);
+    // // fs.list_dir();
     // fs.create_dir("root/def");
+    // fs.create_file("root/def/abc", 600);
     // fs.create_dir("root/.def");
     // // fs.create_dir("root/.def/.ghi");
     // // fs.create_dir("/def");
@@ -1800,15 +1813,21 @@ int main(int argc, char *argv[])
     // // fs._remove(1, -1);
     // fs._remove(0, 4);
     // fs.remove("/root", 1);
-    fs.create_file("abc", 1);
-    fs.cat("abc");
-    fs.list_dir();
-    fs.sum();
-    
-    fs.remove("abc");
+    // fs.create_file("large-random", 600);
+    // fs.cat("large-random");
+    // fs.list_dir();
+    // fs.sum();
 
+    // fs.remove("large-random-copy");
+    // fs._copy(5, 0, "large-random-copy");
+    // fs.cat("large-random-copy");
     fs.list_dir();
     fs.sum();
+
+    // fs.remove("abc");
+
+    // fs.list_dir();
+    // fs.sum();
 
     // string test_str = "123456789";
     // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
