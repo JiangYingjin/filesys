@@ -1219,9 +1219,14 @@ public:
         file_data_str.reserve(inode.file_size);
         for (const auto &block_id : block_id_list)
         {
-            unique_ptr<char[]> block(new char[BLOCK_SIZE]);
-            _load(block.get(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
-            file_data_str.append(block.get(), BLOCK_SIZE);
+            vector<char> content(BLOCK_SIZE);
+            _load(content.data(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
+            // cout << "[加载文件] 读取数据块 " << block_id << " 内容：" << endl
+            //      << content << endl;
+            file_data_str.append(content.data(), BLOCK_SIZE);
+            // unique_ptr<char[]> block(new char[BLOCK_SIZE]);
+            // _load(block.get(), BLOCK_START + block_id * BLOCK_SIZE, BLOCK_SIZE);
+            // file_data_str.append(block.get(), BLOCK_SIZE);
         }
 
         return file_data_str;
@@ -1286,11 +1291,13 @@ public:
         // 向数据块写入随机内容
         for (const auto &id : block_id_list)
         {
-            char *block = new char[BLOCK_SIZE];
+            vector<char> content(BLOCK_SIZE);
             for (int i = 0; i < BLOCK_SIZE; i++)
-                block[i] = rand() % 26 + 'a';
-            _dump(block, BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
-            delete[] block;
+                // content[i] = 'a' + rand() % 26;
+                content[i] = '0' + i % 10;
+            // cout << "[创建文件] 写入数据块 " << id << " 内容：" << endl
+            //      << content << endl;
+            _dump(content.data(), BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
         }
 
         cout << "[创建文件] 新 Inode 信息：" << endl;
@@ -1517,7 +1524,6 @@ public:
 
         // 读取文件内容
         string content = _load_file(file_inode);
-        // _load_file(&content, file_inode);
         cout << "[查看文件内容] 文件 " << absolute_path << " 内容如下：" << endl;
         cout << content << endl;
         cout << "-------------------------" << endl;
@@ -1733,7 +1739,10 @@ int main(int argc, char *argv[])
     // // // 创建文件 / 文件夹 / 打印文件内容联测
     // // fs.change_dir("root/.def/.ghi");
     // fs.create_file("abc", 10);
-    fs.create_file("abc", 600);
+    // fs.create_file("abc", 600);
+    // fs.remove("abc");
+    // fs.create_file("abc", 600);
+    // fs.cat("abc");
     // // fs.cat("/root/.def/.ghi/abc");
     // fs.list_dir();
     // fs.sum();
@@ -1743,11 +1752,22 @@ int main(int argc, char *argv[])
     // // fs._remove(1, -1);
     // fs._remove(0, 4);
     // fs.remove("/root", 1);
-    // fs.cat("abc");
+    fs.create_file("abc", 1);
+    fs.cat("abc");
     fs.remove("abc");
 
     fs.list_dir();
     fs.sum();
+
+    // string test_str = "123456789";
+    // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
+    // string test_str;
+    // string test_str("\0");
+    // test_str.reserve(10);
+    // cout << &test_str << endl;
+    // cout << &test_str[0] << endl;
+    // cout << test_str.data() << endl;
+    // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
 
     // fs.change_dir("/root");
     // fs.change_dir("/root/.def");
