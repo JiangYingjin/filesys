@@ -1232,6 +1232,42 @@ public:
         return file_data_str;
     }
 
+    const short _create_file(const short &dir_inode_id, const string &filename, const int &filesize_kb)
+    {
+        short new_inode_id = _get_avail_inode();
+        cout << "[创建文件] 已申请新 Inode：" << new_inode_id << endl;
+
+        // Inode
+        _save_inode(new_inode_id, 'f', filesize_kb * 1024);
+
+        // 目录项
+        _add_dentry(dir_inode_id, new_inode_id, filename);
+
+        // 数据块
+        vector<short> block_id_list;
+        for (int i = 0; i < filesize_kb; i++)
+        {
+            short id = _get_avail_block();
+            block_id_list.push_back(id);
+            cout << "[创建文件] 已申请第 " << i << " 个块：" << id << endl;
+        }
+        _set_block_list(new_inode_id, block_id_list);
+
+        // 向数据块写入随机内容
+        for (const auto &id : block_id_list)
+        {
+            vector<char> content(BLOCK_SIZE);
+            for (int i = 0; i < BLOCK_SIZE; i++)
+                // content[i] = 'a' + rand() % 26;
+                content[i] = '0' + i % 10;
+            // cout << "[创建文件] 写入数据块 " << id << " 内容：" << endl
+            //      << content << endl;
+            _dump(content.data(), BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
+        }
+
+        return new_inode_id;
+    }
+
     // 传入文件路径和文件大小（KB），创建文件
     void create_file(const string path, int filesize_kb)
     {
@@ -1269,41 +1305,33 @@ public:
             return;
         }
 
-        short new_inode_id = _get_avail_inode();
-        cout << "[创建文件] 已申请新 Inode：" << new_inode_id << endl;
-
-        // Inode
-        _save_inode(new_inode_id, 'f', filesize_kb * 1024);
-
-        // 目录项
-        _add_dentry(dir_inode_id, new_inode_id, _filename(path));
-
-        // 数据块
-        vector<short> block_id_list;
-        for (int i = 0; i < filesize_kb; i++)
-        {
-            short id = _get_avail_block();
-            block_id_list.push_back(id);
-            cout << "[创建文件] 已申请第 " << i << " 个块：" << id << endl;
-        }
-        _set_block_list(new_inode_id, block_id_list);
-
-        // 向数据块写入随机内容
-        for (const auto &id : block_id_list)
-        {
-            vector<char> content(BLOCK_SIZE);
-            for (int i = 0; i < BLOCK_SIZE; i++)
-                // content[i] = 'a' + rand() % 26;
-                content[i] = '0' + i % 10;
-            // cout << "[创建文件] 写入数据块 " << id << " 内容：" << endl
-            //      << content << endl;
-            _dump(content.data(), BLOCK_START + id * BLOCK_SIZE, BLOCK_SIZE);
-        }
+        short new_inode_id = _create_file(dir_inode_id, _filename(path), filesize_kb);
 
         cout << "[创建文件] 新 Inode 信息：" << endl;
         cout << _get_inode(new_inode_id) << endl;
 
         cout << "[创建文件] 文件 " << absolute_path << " 创建成功" << endl;
+    }
+
+    const short _create_dir(const short &dir_inode_id, const string &new_dirname)
+    {
+        // 申请新可用 Inode 和 Block
+        short new_inode_id = _get_avail_inode();
+        cout << "[创建目录] 已申请新 Inode：" << new_inode_id << endl;
+
+        short new_block_id = _get_avail_block();
+        cout << "[创建目录] 已申请新 Block：" << new_block_id << endl;
+
+        // 初始化 Inode
+        _save_inode(new_inode_id, 'd', BLOCK_SIZE);
+
+        // 初始化 Dentry 数据块
+        _create_blank_dentries(new_block_id, new_inode_id, dir_inode_id);
+
+        // 向新文件所在的目录添加目录项
+        _add_dentry(dir_inode_id, new_inode_id, new_dirname);
+
+        return new_inode_id;
     }
 
     void create_dir(const string path)
@@ -1342,21 +1370,7 @@ public:
             return;
         }
 
-        // 申请新可用 Inode 和 Block
-        short new_inode_id = _get_avail_inode();
-        cout << "[创建目录] 已申请新 Inode：" << new_inode_id << endl;
-
-        short new_block_id = _get_avail_block();
-        cout << "[创建目录] 已申请新 Block：" << new_block_id << endl;
-
-        // 初始化 Inode
-        _save_inode(new_inode_id, 'd', BLOCK_SIZE);
-
-        // 初始化 Dentry 数据块
-        _create_blank_dentries(new_block_id, new_inode_id, dir_inode_id);
-
-        // 向新文件所在的目录添加目录项
-        _add_dentry(dir_inode_id, new_inode_id, _filename(path));
+        short new_inode_id = _create_dir(dir_inode_id, _filename(path));
 
         cout << "[创建目录] 新 Inode 信息：" << endl;
         cout << _get_inode(new_inode_id) << endl;
@@ -1494,6 +1508,40 @@ public:
             }
         }
     }
+
+    // void _copy(const short &src_dir_inode_id, const short &src_inode_id, const short &dst_dir_inode_id, const string &dst_filename)
+    // {
+    //     // 假设已经完成了一切检查，此函数仅作执行操作
+    //     if (_get_inode(src_inode_id).file_type == 'f')
+    //     {
+    //         // 创建文件
+    //         create_file(_absolute_path(dst_filename), _get_inode(src_inode_id).file_size / 1024);
+    //         short dst_inode_id;
+    //         _search_inode(dst_filename, dst_dir_inode_id, dst_inode_id);
+    //         vector<short> src_block_list = _get_block_list(src_inode_id);
+    //         vector<short> dst_block_list = _get_block_list(dst_inode_id);
+    //         for (int i = 0; i < src_block_list.size(); i++)
+    //         {
+    //             _dump(BLOCK_START + dst_block_list[i] * BLOCK_SIZE, BLOCK_START + src_block_list[i] * BLOCK_SIZE, BLOCK_SIZE);
+    //         }
+    //     }
+    //     else if (_get_inode(src_inode_id).file_type == 'd')
+    //     {
+    //         // 创建目录
+    //         create_dir(_absolute_path(dst_filename));
+    //         short dst_inode_id;
+    //         _search_inode(dst_filename, dst_dir_inode_id, dst_inode_id);
+    //         vector<Dentry> src_dentry_list = _load_dentries(src_inode_id);
+    //         vector<Dentry> dst_dentry_list = _load_dentries(dst_inode_id);
+    //         for (int i = 0; i < src_dentry_list.size(); i++)
+    //         {
+    //             if (src_dentry_list[i].inode_id != -1)
+    //             {
+    //                 _copy(src_inode_id, src_dentry_list[i].inode_id, dst_inode_id, src_dentry_list[i].get_filename());
+    //             }
+    //         }
+    //     }
+    // }
 
     // 读取并打印文件内容
     void cat(const string &path)
@@ -1754,6 +1802,9 @@ int main(int argc, char *argv[])
     // fs.remove("/root", 1);
     fs.create_file("abc", 1);
     fs.cat("abc");
+    fs.list_dir();
+    fs.sum();
+    
     fs.remove("abc");
 
     fs.list_dir();
