@@ -840,9 +840,10 @@ public:
         }
 
         // 若 absolute_path 末尾为 /..
-        regex double_dot_pattern("/\\.\\.[/$]");
-        regex double_dot_valid_pattern("(/[^/]+?/\\.\\.)[/$]");
+        regex double_dot_pattern("/\\.\\.(/|$)");
+        regex double_dot_valid_pattern("(/[^/]+?/\\.\\.)(/|$)");
         smatch double_dot_match, double_dot_valid_match;
+        cout << "[获取绝对路径] 双点正则匹配结果：" << regex_search(absolute_path, double_dot_match, double_dot_pattern) << endl;
         // 若 absolute_path 含有 ..
         if (regex_search(absolute_path, double_dot_match, double_dot_pattern))
         {
@@ -933,71 +934,79 @@ public:
 
         short ptr_inode_id = ROOT_INODE_ID;
 
-        for (const auto &level : dir_vector)
+        if (dir_vector.empty())
         {
-            // 获取当前目录级别的数据块
-            // cout << "[查找 Inode] 当前目录级别：" << level << endl;
+            cout << "[查找 Inode] 路径为空，返回根目录 Inode ID：" << ptr_inode_id << endl;
+            dir_inode_id = ptr_inode_id;
+            file_inode_id = ptr_inode_id;
+        }
 
-            // 如果非最后一级的 level 不是目录
-            if (_get_inode(ptr_inode_id).file_type != 'd' && &level != &dir_vector.back())
+        else
+            for (const auto &level : dir_vector)
             {
-                cout << "[查找 Inode] 当前目录级别不是目录，查找失败！" << endl;
-                dir_inode_id = -1;
-                file_inode_id = -1;
-                return;
-            }
+                // 获取当前目录级别的数据块
+                // cout << "[查找 Inode] 当前目录级别：" << level << endl;
 
-            vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
-
-            // cout << "[查找 Inode] 当前目录项：" << endl;
-            // for (const auto &dentry : _dentry_list)
-            //     cout << dentry << endl;
-
-            // 遍历目录项
-            bool found = false;
-            for (const auto &dentry : _dentry_list)
-                if (dentry.filename == level)
+                // 如果非最后一级的 level 不是目录
+                if (_get_inode(ptr_inode_id).file_type != 'd' && &level != &dir_vector.back())
                 {
-                    found = true;
-                    cout << "[查找 Inode] 寻找到目录项 " << level << "（inode_id: " << dentry.inode_id << "）" << endl;
-
-                    // 如果还不是最后一个目录项
-                    if (&level != &dir_vector.back())
-                    {
-                        // 则需要继续往下找
-                        ptr_inode_id = dentry.inode_id;
-                        cout << "[查找 Inode] 继续向下一级寻找，ptr_inode_id: " << ptr_inode_id << endl;
-                    }
-                    else
-                    {
-                        // 否则找到了文件
-                        dir_inode_id = ptr_inode_id;
-                        file_inode_id = dentry.inode_id;
-                        cout << "[查找 Inode] 找到了最终项 " << level << "，此时 dir_inode_id: " << dir_inode_id << "，file_inode_id: " << file_inode_id << endl;
-                    }
-                    break;
-                }
-
-            if (!found)
-            {
-                // 找到了次末级目录，但是没有找到最终项（文件/文件夹）
-                // 如果是最后一个，则说明文件不存在，否则说明目录不存在
-                if (&level == &dir_vector.back())
-                {
-                    dir_inode_id = ptr_inode_id;
-                    file_inode_id = -1;
-                    cout << "[查找 Inode] 文件 " << level << " 不存在" << endl;
-                }
-                else
-                // 否则则是在中途找不到目录的情况
-                {
+                    cout << "[查找 Inode] 当前目录级别不是目录，查找失败！" << endl;
                     dir_inode_id = -1;
                     file_inode_id = -1;
-                    cout << "[查找 Inode] 目录 " << level << " 不存在" << endl;
+                    return;
                 }
-                return;
+
+                vector<Dentry> _dentry_list = _load_dentries(ptr_inode_id);
+
+                // cout << "[查找 Inode] 当前目录项：" << endl;
+                // for (const auto &dentry : _dentry_list)
+                //     cout << dentry << endl;
+
+                // 遍历目录项
+                bool found = false;
+                for (const auto &dentry : _dentry_list)
+                    if (dentry.filename == level)
+                    {
+                        found = true;
+                        cout << "[查找 Inode] 寻找到目录项 " << level << "（inode_id: " << dentry.inode_id << "）" << endl;
+
+                        // 如果还不是最后一个目录项
+                        if (&level != &dir_vector.back())
+                        {
+                            // 则需要继续往下找
+                            ptr_inode_id = dentry.inode_id;
+                            cout << "[查找 Inode] 继续向下一级寻找，ptr_inode_id: " << ptr_inode_id << endl;
+                        }
+                        else
+                        {
+                            // 否则找到了文件
+                            dir_inode_id = ptr_inode_id;
+                            file_inode_id = dentry.inode_id;
+                            cout << "[查找 Inode] 找到了最终项 " << level << "，此时 dir_inode_id: " << dir_inode_id << "，file_inode_id: " << file_inode_id << endl;
+                        }
+                        break;
+                    }
+
+                if (!found)
+                {
+                    // 找到了次末级目录，但是没有找到最终项（文件/文件夹）
+                    // 如果是最后一个，则说明文件不存在，否则说明目录不存在
+                    if (&level == &dir_vector.back())
+                    {
+                        dir_inode_id = ptr_inode_id;
+                        file_inode_id = -1;
+                        cout << "[查找 Inode] 文件 " << level << " 不存在" << endl;
+                    }
+                    else
+                    // 否则则是在中途找不到目录的情况
+                    {
+                        dir_inode_id = -1;
+                        file_inode_id = -1;
+                        cout << "[查找 Inode] 目录 " << level << " 不存在" << endl;
+                    }
+                    return;
+                }
             }
-        }
 
         cout << "[查找 Inode] 根据路径查找 Inode 结果：" << endl;
         cout << "[查找 Inode] dir_inode_id: " << dir_inode_id << endl;
@@ -1812,6 +1821,12 @@ public:
     {
         // 将路径转为绝对路径
         string absolute_path = _absolute_path(path);
+
+        if (absolute_path.empty())
+        {
+            cout << "[切换工作目录] 路径 " << path << " 不合法" << endl;
+            return;
+        }
 
         // 根据路径查找 Inode
         short dir_inode_id, file_inode_id;
