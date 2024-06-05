@@ -166,6 +166,10 @@ public:
     int available_block_num = (FILESYSTEM_SIZE - BLOCK_START) / BLOCK_SIZE; // 可用块的数量
     int available_inode_num = INODE_NUM;                                    // 可用 INode 的数量
 
+    SuperBlock()
+    {
+    }
+
     friend ostream &operator<<(ostream &os, const SuperBlock &superblock)
     {
         os << "--------------- 超级块信息 ---------------" << endl;
@@ -184,6 +188,20 @@ public:
         os << "可用 INode 数量：\t" << superblock.available_inode_num << endl;
         os << "------------------------------------------" << endl;
         return os;
+    }
+
+    // 复制构造函数
+    SuperBlock(const SuperBlock &superblock)
+        : filesystem_size(superblock.filesystem_size), block_size(superblock.block_size), block_num(superblock.block_num), data_block_num(superblock.data_block_num), inode_size(superblock.inode_size), inode_num(superblock.inode_num), available_block_num(superblock.available_block_num), available_inode_num(superblock.available_inode_num)
+    {
+    }
+
+    // 赋值运算符重载
+    SuperBlock &operator=(const SuperBlock &superblock)
+    {
+        this->available_block_num = superblock.available_block_num;
+        this->available_inode_num = superblock.available_inode_num;
+        return *this;
     }
 };
 
@@ -334,6 +352,32 @@ public:
     {
         return bitmap[pos / 8] & (1 << pos % 8);
     }
+
+    friend ostream &operator<<(ostream &os, const Bitmap &bitmap)
+    {
+        os << "--------------- 位图信息 ---------------" << endl;
+        for (int i = 0; i < bitmap.bitmap.size(); i++)
+        {
+            os << bitset<8>(bitmap.bitmap[i]) << " ";
+            if ((i + 1) % 8 == 0)
+                os << endl;
+        }
+        os << "------------------------------------------" << endl;
+        return os;
+    }
+
+    // 复制构造函数
+    Bitmap(const Bitmap &bitmap)
+    {
+        this->bitmap = bitmap.bitmap;
+    }
+
+    // 赋值运算符重载
+    Bitmap &operator=(const Bitmap &bitmap)
+    {
+        this->bitmap = bitmap.bitmap;
+        return *this;
+    }
 };
 
 class FileSystem
@@ -370,6 +414,23 @@ public:
             cout << "[文件系统初始化] 文件系统加载成功！" << endl;
         }
         _init_working_dir();
+    }
+
+    // 赋值构造函数
+    FileSystem(const FileSystem &fs)
+        : superblock(fs.superblock), block_bitmap(fs.block_bitmap), inode_bitmap(fs.inode_bitmap), working_dir(fs.working_dir), working_dir_inode_id(fs.working_dir_inode_id), SUPERBLOCK_CLASS_SIZE(fs.SUPERBLOCK_CLASS_SIZE), INODE_CLASS_SIZE(fs.INODE_CLASS_SIZE)
+    {
+    }
+
+    // 重载赋值运算符
+    FileSystem &operator=(const FileSystem &fs)
+    {
+        superblock = fs.superblock;
+        block_bitmap = fs.block_bitmap;
+        inode_bitmap = fs.inode_bitmap;
+        working_dir = fs.working_dir;
+        working_dir_inode_id = fs.working_dir_inode_id;
+        return *this;
     }
 
     ~FileSystem()
@@ -1959,30 +2020,22 @@ public:
 
 int main(int argc, char *argv[])
 {
-    // static plog::RollingFileAppender<plog::TxtFormatter> fileAppender("main.log");
     static plog::RollingFileAppender<plog::PlainFomatter> fileAppender("main.log");
     plog::init(plog::debug, &fileAppender);
 
-    // static plog::ConsoleAppender<plog::MessageOnlyFormatter> consoleAppender;
-    // plog::init<Console>(plog::info, &consoleAppender);
-
-    dout << "a";
-    dout << "a";
-
-    FileSystem fs;
+    static FileSystem fs;
 
     string user_input;
     vector<string> input_vec;
-
     while (true)
     {
         cout << fs.working_dir << " > ";
         getline(cin, user_input);
         boost::split(input_vec, user_input, boost::is_space(), boost::token_compress_on);
 
-        dout << "用户输入：" << user_input << "，分割结果：" << input_vec << endl;
+        dout << "用户输入：" << user_input << "，分割结果：" << input_vec << "，长度：" << input_vec.size() << "，为空：" << input_vec.empty() << endl;
 
-        if (input_vec.size() > 0)
+        if (!input_vec.empty())
         {
             // l / ls
             if (input_vec[0] == "l" || input_vec[0] == "ls")
@@ -2097,26 +2150,32 @@ int main(int argc, char *argv[])
             else if (input_vec[0] == "sum")
                 fs.sum();
 
+            // bitmap / bm
+            else if (input_vec[0] == "bitmap" || input_vec[0] == "bm")
+                fs._show_bitmap();
+
             // exit
             else if (input_vec[0] == "exit")
                 break;
+
+            else if (input_vec[0] == "clear")
+                system("clear");
+
+            // erase
+            else if (input_vec[0] == "erase")
+            {
+                // delete &fs;
+                system("rm file.sys");
+                fs = FileSystem();
+            }
+
+            else if (input_vec[0] == "")
+                ;
 
             else
                 cout << "command not found: " << input_vec[0] << endl;
         }
     }
-
-    // // 创建文件夹数量测试
-    // for (int i = 1; i < 8190; i++)
-    //     fs.create_dir("/d" + to_string(i));
-
-    // // 小文件数量测试
-    // for (int i = 1; i < 8192; i++)
-    //     fs.create_file("/f" + to_string(i), 1);
-
-    // // 列出目录测试
-    // for (int i = 1; i <= 10; i++)
-    //     fs.create_file("/f" + to_string(i), 1);
 
     return 0;
 }

@@ -27,3 +27,6 @@ namespace plog
         }
     };
 }
+
+// static plog::ConsoleAppender<plog::MessageOnlyFormatter> consoleAppender;
+// plog::init<Console>(plog::info, &consoleAppender);
