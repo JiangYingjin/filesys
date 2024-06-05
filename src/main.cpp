@@ -170,20 +170,35 @@ public:
 
     friend ostream &operator<<(ostream &os, const SuperBlock &superblock)
     {
-        os << "--------------- 超级块信息 ---------------" << endl;
-        os << "文件系统大小：\t\t" << float(superblock.filesystem_size) / 1024 / 1024 << " MB" << endl;
-        os << "块（Block）大小：\t" << superblock.block_size << " Byte" << endl;
-        os << "块（Block）数量：\t" << superblock.block_num << endl;
-        os << "数据块数量：\t\t" << superblock.data_block_num << endl;
-        os << "INode 大小：\t\t" << superblock.inode_size << " Byte" << endl;
-        os << "INode 数量：\t\t" << superblock.inode_num << endl;
+        // os << "--------------- 超级块信息 ---------------" << endl;
+        // os << "文件系统大小：\t\t" << float(superblock.filesystem_size) / 1024 / 1024 << " MB" << endl;
+        // os << "块（Block）大小：\t" << superblock.block_size << " Byte" << endl;
+        // os << "块（Block）数量：\t" << superblock.block_num << endl;
+        // os << "数据块数量：\t\t" << superblock.data_block_num << endl;
+        // os << "INode 大小：\t\t" << superblock.inode_size << " Byte" << endl;
+        // os << "INode 数量：\t\t" << superblock.inode_num << endl;
+        // os << "------------------------------------------" << endl;
+        // os << "已占用空间：\t\t" << (superblock.block_num - superblock.available_block_num) * superblock.block_size << " Byte" << endl;
+        // os << "可用空间：\t\t" << superblock.available_block_num * superblock.block_size << " Byte" << endl;
+        // os << "已用块数量：\t\t" << superblock.block_num - superblock.available_block_num << endl;
+        // os << "可用块数量：\t\t" << superblock.available_block_num << endl;
+        // os << "已用 INode 数量：\t" << superblock.inode_num - superblock.available_inode_num << endl;
+        // os << "可用 INode 数量：\t" << superblock.available_inode_num << endl;
+
+        os << "------------ SuperBlock Info -------------" << endl;
+        os << "Filesystem Size:\t" << Util::readable_size(superblock.filesystem_size) << endl;
+        os << "Block Size:\t\t" << superblock.block_size << " Byte" << endl;
+        os << "Block Num:\t\t" << superblock.block_num << endl;
+        os << "Data Block Num:\t\t" << superblock.data_block_num << endl;
+        os << "INode Size:\t\t" << superblock.inode_size << " Byte" << endl;
+        os << "INode Num:\t\t" << superblock.inode_num << endl;
         os << "------------------------------------------" << endl;
-        os << "已占用空间：\t\t" << (superblock.block_num - superblock.available_block_num) * superblock.block_size << " Byte" << endl;
-        os << "可用空间：\t\t" << superblock.available_block_num * superblock.block_size << " Byte" << endl;
-        os << "已用块数量：\t\t" << superblock.block_num - superblock.available_block_num << endl;
-        os << "可用块数量：\t\t" << superblock.available_block_num << endl;
-        os << "已用 INode 数量：\t" << superblock.inode_num - superblock.available_inode_num << endl;
-        os << "可用 INode 数量：\t" << superblock.available_inode_num << endl;
+        os << "Used Space:\t\t" << Util::readable_size((superblock.block_num - superblock.available_block_num) * superblock.block_size) << endl;
+        os << "Available Space:\t" << Util::readable_size(superblock.available_block_num * superblock.block_size) << endl;
+        os << "Used Block Num:\t\t" << superblock.block_num - superblock.available_block_num << endl;
+        os << "Available Block Num:\t" << superblock.available_block_num << endl;
+        os << "Used INode Num:\t\t" << superblock.inode_num - superblock.available_inode_num << endl;
+        os << "Available INode Num:\t" << superblock.available_inode_num << endl;
         os << "------------------------------------------" << endl;
         return os;
     }
@@ -399,17 +414,21 @@ public:
     {
         if (!_is_filesys_exist())
         {
-            cout << "[文件系统初始化] 文件系统不存在，创建中 ..." << endl;
+            // cout << "[文件系统初始化] 文件系统不存在，创建中 ..." << endl;
+            cout << "[Init] File system does not exist, creating ..." << endl;
             _create_filesys();
-            cout << "[文件系统初始化] 文件系统创建成功！" << endl;
+            // cout << "[文件系统初始化] 文件系统创建成功！" << endl;
+            cout << "[Init] File system created successfully!" << endl;
         }
         else
         {
-            cout << "[文件系统初始化] 文件系统已存在，加载中 ..." << endl;
+            // cout << "[文件系统初始化] 文件系统已存在，加载中 ..." << endl;
+            cout << "[Init] File system already exists, loading ..." << endl;
             _load(&superblock, SUPERBLOCK_START, SUPERBLOCK_CLASS_SIZE);
             _load(block_bitmap.bitmap.data(), BLOCK_BITMAP_START, BLOCK_BITMAP_SIZE);
             _load(inode_bitmap.bitmap.data(), INODE_BITMAP_START, INODE_BITMAP_SIZE);
-            cout << "[文件系统初始化] 文件系统加载成功！" << endl;
+            // cout << "[文件系统初始化] 文件系统加载成功！" << endl;
+            cout << "[Init] File system loaded successfully!" << endl;
         }
         _init_working_dir();
     }
@@ -434,14 +453,16 @@ public:
     ~FileSystem()
     {
         _dump_header();
-        cout << "[文件系统退出] 文件系统元数据已保存，退出成功！" << endl;
+        // cout << "[文件系统退出] 文件系统元数据已保存，退出成功！" << endl;
+        cout << "[Exit] File system metadata saved, exit successfully!" << endl;
     }
 
     void _dump(const void *data, int pos, int size)
     {
         fstream file(FILESYSTEM_NAME, ios::in | ios::out | ios::binary);
         if (!file)
-            cout << "文件打开失败" << endl;
+            // cout << "文件打开失败" << endl;
+            cout << "File open failed" << endl;
         file.seekp(pos, ios::beg);
         file.write((char *)data, size);
         file.close();
@@ -452,7 +473,8 @@ public:
     {
         fstream file(FILESYSTEM_NAME, ios::in | ios::out | ios::binary);
         if (!file)
-            cout << "文件打开失败" << endl;
+            // cout << "文件打开失败" << endl;
+            cout << "File open failed" << endl;
         file.seekg(pos, ios::beg);
         file.read((char *)data, size);
         file.close();
@@ -476,14 +498,14 @@ public:
     // 初始化根目录
     void _init_root_dir()
     {
-        cout << "[初始化根目录] 准备初始化 ..." << endl;
+        dout << "[初始化根目录] 准备初始化 ..." << endl;
 
         // Inode
         _save_inode(_get_avail_inode(), 'd', BLOCK_SIZE);
         // 数据块
         _create_blank_dentries(_get_avail_block(), ROOT_INODE_ID, ROOT_INODE_ID);
 
-        cout << "[初始化根目录] 初始化完成！" << endl;
+        dout << "[初始化根目录] 初始化完成！" << endl;
     }
 
     void _init_working_dir()
@@ -1408,26 +1430,30 @@ public:
 
         if (dir_inode_id == -1)
         {
-            cout << "[创建文件] 路径 " << absolute_path << " 无效" << endl;
+            // cout << "[创建文件] 路径 " << absolute_path << " 无效" << endl;
+            cout << "touch: cannot touch '" << absolute_path << "': No such file or directory" << endl;
             return;
         }
 
         // 如果 file_inode_id 不为 -1，则说明文件已存在
         if (file_inode_id != -1)
         {
-            cout << "[创建文件] 文件 " << absolute_path << " 已存在" << endl;
+            // cout << "[创建文件] 文件 " << absolute_path << " 已存在" << endl;
+            cout << "touch: cannot touch '" << absolute_path << "': File exists" << endl;
             return;
         }
 
         if (superblock.available_inode_num == 0)
         {
-            cout << "[创建文件] 可用 Inode 不足，文件创建失败！" << endl;
+            // cout << "[创建文件] 可用 Inode 不足，文件创建失败！" << endl;
+            cout << "touch: cannot touch '" << absolute_path << "': No available inode" << endl;
             return;
         }
 
         if (superblock.available_block_num < Util::block_occupation(filesize_kb))
         {
-            cout << "[创建文件] 可用块不足，文件创建失败！创建大小为 " << filesize_kb << "KB 的文件需要 " << Util::block_occupation(filesize_kb) << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
+            // cout << "[创建文件] 可用块不足，文件创建失败！创建大小为 " << filesize_kb << "KB 的文件需要 " << Util::block_occupation(filesize_kb) << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
+            cout << "touch: cannot touch '" << absolute_path << "': No available block" << endl;
             return;
         }
 
@@ -1469,7 +1495,8 @@ public:
 
         if (superblock.available_inode_num == 0)
         {
-            cout << "[创建目录] 可用 Inode 不足，目录创建失败！" << endl;
+            // cout << "[创建目录] 可用 Inode 不足，目录创建失败！" << endl;
+            cout << "mkdir: cannot create directory '" << absolute_path << "': No available inode" << endl;
             return;
         }
 
@@ -1477,7 +1504,8 @@ public:
         {
             dout << "[创建目录] 可用块不足，目录创建失败！此时的超级块信息：" << endl;
             dout << superblock;
-            cout << "[创建目录] 可用块不足，目录创建失败！" << endl;
+            // cout << "[创建目录] 可用块不足，目录创建失败！" << endl;
+            cout << "mkdir: cannot create directory '" << absolute_path << "': No available block" << endl;
             return;
         }
 
@@ -1488,7 +1516,8 @@ public:
         // 如果 file_inode_id 不为 -1，则说明文件已存在
         if (file_inode_id != -1)
         {
-            cout << "[创建目录] " << absolute_path << " 已存在" << endl;
+            // cout << "[创建目录] " << absolute_path << " 已存在" << endl;
+            cout << "mkdir: cannot create directory '" << absolute_path << "': File exists" << endl;
             return;
         }
 
@@ -1497,7 +1526,8 @@ public:
         {
             if (dir_inode_id == -1)
             {
-                cout << "[创建目录] 路径 " << absolute_path << " 无效" << endl;
+                // cout << "[创建目录] 路径 " << absolute_path << " 无效" << endl;
+                cout << "mkdir: cannot create directory '" << absolute_path << "': No such file or directory" << endl;
                 return;
             }
 
@@ -1613,19 +1643,22 @@ public:
 
         if (absolute_path == "/")
         {
-            cout << "[删除文件/目录] 根目录不可删除" << endl;
+            // cout << "[删除文件/目录] 根目录不可删除" << endl;
+            cout << "rm: cannot remove root directory" << endl;
             return;
         }
 
         if (absolute_path == working_dir)
         {
-            cout << "[删除文件/目录] 当前工作目录不可删除" << endl;
+            // cout << "[删除文件/目录] 当前工作目录不可删除" << endl;
+            cout << "rm: cannot remove current working directory" << endl;
             return;
         }
 
         if (path == "." || path == ".." || Util::ends_with(path, "/.") || Util::ends_with(path, "/.."))
         {
-            cout << "[删除文件/目录] 不可删除 '.' 或 '..'" << endl;
+            // cout << "[删除文件/目录] 不可删除 '.' 或 '..'" << endl;
+            cout << "rm: cannot remove '.' or '..'" << endl;
             return;
         }
 
@@ -1635,7 +1668,8 @@ public:
 
         if (file_inode_id == -1)
         {
-            cout << "[删除文件/目录] 文件 " << absolute_path << " 不存在" << endl;
+            // cout << "[删除文件/目录] 文件 " << absolute_path << " 不存在" << endl;
+            cout << "rm: cannot remove '" << absolute_path << "': No such file or directory" << endl;
             return;
         }
 
@@ -1652,7 +1686,9 @@ public:
         {
             if (!recursive)
             {
-                cout << "[删除文件/目录] 无法删除目录 " << absolute_path << "，如需删除，请使用 rm -r" << endl;
+                // cout << "[删除文件/目录] 无法删除目录 " << absolute_path << "，如需删除，请使用 rm -r" << endl;
+                cout << "rm: cannot remove '" << absolute_path << "': Is a directory" << endl;
+                cout << "rm: use 'rm -r' to remove a directory" << endl;
                 return;
             }
             else if (recursive)
@@ -1721,7 +1757,8 @@ public:
 
         if (src_file_inode_id == -1)
         {
-            cout << "[复制文件/目录] 源文件/目录 " << absolute_src_path << " 不存在" << endl;
+            // cout << "[复制文件/目录] 源文件/目录 " << absolute_src_path << " 不存在" << endl;
+            cout << "cp: cannot copy '" << absolute_src_path << "': No such file or directory" << endl;
             return;
         }
 
@@ -1729,7 +1766,8 @@ public:
 
         if (dst_dir_inode_id == -1)
         {
-            cout << "[复制文件/目录] 目标路径 " << absolute_dst_path << " 有误" << endl;
+            // cout << "[复制文件/目录] 目标路径 " << absolute_dst_path << " 有误" << endl;
+            cout << "cp: cannot copy into '" << absolute_dst_path << "': No such file or directory" << endl;
             return;
         }
 
@@ -1737,6 +1775,7 @@ public:
         {
             dout << "[复制文件/目录] 目标文件/目录 " << absolute_dst_path << " 已存在，其 INode 如下：" << endl;
             dout << _get_inode(dst_file_inode_id);
+            cout << "cp: cannot copy into '" << absolute_dst_path << "': File exists" << endl;
             return;
         }
 
@@ -1744,7 +1783,8 @@ public:
 
         if (superblock.available_inode_num < src_inode_cnt)
         {
-            cout << "[复制文件/目录] 可用 Inode 不足，复制失败！源文件/目录占用 " << src_inode_cnt << " 个 Inode，目前可用 Inode 剩余 " << superblock.available_inode_num << " 个" << endl;
+            // cout << "[复制文件/目录] 可用 Inode 不足，复制失败！源文件/目录占用 " << src_inode_cnt << " 个 Inode，目前可用 Inode 剩余 " << superblock.available_inode_num << " 个" << endl;
+            cout << "cp: cannot copy '" << absolute_src_path << "': No available inode" << endl;
             return;
         }
 
@@ -1753,6 +1793,7 @@ public:
         if (superblock.available_block_num < src_block_cnt)
         {
             cout << "[复制文件/目录] 可用块不足，复制失败！源文件/目录占用 " << src_block_cnt << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
+            cout << "cp: cannot copy '" << absolute_src_path << "': No available block" << endl;
             return;
         }
 
@@ -1775,7 +1816,9 @@ public:
         {
             if (!recursive)
             {
-                cout << "[复制文件/目录] 无法复制目录 " << absolute_src_path << "，如需复制，请使用 cp -r" << endl;
+                // cout << "[复制文件/目录] 无法复制目录 " << absolute_src_path << "，如需复制，请使用 cp -r" << endl;
+                cout << "cp: cannot copy '" << absolute_src_path << "': Is a directory" << endl;
+                cout << "cp: use 'cp -r' to copy a directory" << endl;
                 return;
             }
             else if (recursive)
@@ -1810,7 +1853,8 @@ public:
         // 如果 file_inode_id 为 -1，则说明文件不存在
         if (file_inode_id == -1)
         {
-            cout << "[查看文件内容] 文件 " << absolute_path << " 不存在" << endl;
+            // cout << "[查看文件内容] 文件 " << absolute_path << " 不存在" << endl;
+            cout << "cat: " << absolute_path << ": No such file or directory" << endl;
             return;
         }
 
@@ -1820,15 +1864,16 @@ public:
         // 如果不是文件
         if (file_inode.file_type != 'f')
         {
-            cout << "[查看文件内容] " << absolute_path << " 不是文件" << endl;
+            // cout << "[查看文件内容] " << absolute_path << " 不是文件" << endl;
+            cout << "cat: " << absolute_path << ": Is a directory" << endl;
             return;
         }
 
         // 读取文件内容
         string content = _load_file(file_inode);
-        cout << "[查看文件内容] 文件 " << absolute_path << " 内容如下：" << endl;
+        // cout << "[查看文件内容] 文件 " << absolute_path << " 内容如下：" << endl;
         cout << content << endl;
-        cout << "-------------------------" << endl;
+        // cout << "-------------------------" << endl;
     }
 
     // 改变当前工作目录
@@ -1839,7 +1884,8 @@ public:
 
         if (absolute_path.empty())
         {
-            cout << "[切换工作目录] 路径 " << path << " 不合法" << endl;
+            // cout << "[切换工作目录] 路径 " << path << " 不合法" << endl;
+            cout << "cd: invalid path" << endl;
             return;
         }
 
@@ -1851,7 +1897,8 @@ public:
         // 如果 dir_inode_id 为 -1，则说明目录不存在
         if (_inode_id == -1)
         {
-            cout << "[切换工作目录] " << absolute_path << " 不存在" << endl;
+            // cout << "[切换工作目录] " << absolute_path << " 不存在" << endl;
+            cout << "cd: " << absolute_path << ": No such file or directory" << endl;
             return;
         }
         else
@@ -1859,7 +1906,8 @@ public:
             INode dir_inode = _get_inode(_inode_id);
             if (dir_inode.file_type != 'd')
             {
-                cout << "[切换工作目录] " << absolute_path << " 不是目录" << endl;
+                // cout << "[切换工作目录] " << absolute_path << " 不是目录" << endl;
+                cout << "cd: " << absolute_path << ": Not a directory" << endl;
                 return;
             }
             else
@@ -1888,7 +1936,8 @@ public:
         // 如果 dir_inode_id 为 -1，则说明目录不存在
         if (_inode_id == -1)
         {
-            cout << "[列出目录] " << absolute_path << " 不存在" << endl;
+            // cout << "[列出目录] " << absolute_path << " 不存在" << endl;
+            cout << "ls: cannot access '" << absolute_path << "': No such file or directory" << endl;
             return;
         }
         else
@@ -1896,13 +1945,14 @@ public:
             INode _inode = _get_inode(_inode_id);
             if (_inode.file_type != 'd')
             {
-                cout << "[列出目录] " << absolute_path << " 不是目录" << endl;
+                // cout << "[列出目录] " << absolute_path << " 不是目录" << endl;
+                cout << "ls: cannot access '" << absolute_path << "': Not a directory" << endl;
                 return;
             }
             else
             {
                 vector<Dentry> dentry_list = _load_dentries(_inode);
-                cout << "[列出目录] 目录 " << absolute_path << " 内容如下：" << endl;
+                // cout << "[列出目录] 目录 " << absolute_path << " 内容如下：" << endl;
                 for (const auto &dentry : dentry_list)
                 {
                     if (dentry.inode_id != -1)
@@ -1910,11 +1960,14 @@ public:
                         INode inode = _get_inode(dentry.inode_id);
                         cout << setw(4) << inode.id << "  ";
                         if (inode.file_type == 'd')
-                            cout << "目录 ";
+                            // cout << "目录 ";
+                            cout << " dir ";
                         else if (inode.file_type == 'f')
-                            cout << "文件 ";
+                            // cout << "文件 ";
+                            cout << "file ";
                         else
-                            cout << "未知 ";
+                            // cout << "未知 ";
+                            cout << "unkn ";
                         cout << setw(2) << inode.link_cnt << "  ";
                         cout << setw(4) << Util::readable_size(inode.file_size) << "  ";
                         cout << Util::time_to_string(inode.create_time) << " ";
@@ -2005,7 +2058,8 @@ public:
             {"NUM_DOUBLE_INDIRECT_BLOCK", NUM_DOUBLE_INDIRECT_BLOCK},
             {"ROOT_INODE_ID", ROOT_INODE_ID}};
 
-        cout << "----------- 文件系统预定义常量 -----------" << endl;
+        // cout << "----------- 文件系统预定义常量 ------------" << endl;
+        cout << "---- Filesystem Predefined Constants ----" << endl;
         for (const auto &pair : FILESYS_INFO)
         {
             Util::cout_center(pair.first, 30);
@@ -2034,10 +2088,76 @@ public:
 
 int main(int argc, char *argv[])
 {
-    static plog::RollingFileAppender<plog::PlainFomatter> fileAppender("main.log");
-    static plog::ConsoleAppender<plog::PlainFomatter> consoleAppender;
-    // plog::init(plog::debug, &fileAppender);
-    plog::init(plog::debug, &consoleAppender);
+    system("clear");
+
+    if (argc > 1)
+    {
+        string param = string(argv[1]);
+        if (param == "d" || param == "debug")
+        {
+            static plog::ConsoleAppender<plog::PlainFomatter> consoleAppender;
+            plog::init(plog::debug, &consoleAppender);
+            // static plog::RollingFileAppender<plog::PlainFomatter> fileAppender("main.log");
+            // plog::init(plog::debug, &fileAppender);
+        }
+    }
+
+    cout << R"(
+
+    ███████     █████████      JIANG Ying-Jin（江英进）
+  ███░░░░░███  ███░░░░░███         202130430089     
+ ███     ░░███░███    ░░░                   
+░███      ░███░░█████████      LI Jinyi（李晋一）                         
+░███      ░███ ░░░░░░░░███         202130430119      
+░░███     ███  ███    ░███                 
+ ░░░███████░  ░░█████████      LI Lulong（李宇龙）                        
+   ░░░░░░░     ░░░░░░░░░           202130430126                     
+                                                        
+ ██████████                     ███                     
+░░███░░░░███                   ░░░                      
+ ░███   ░░███  ██████   █████  ████   ███████ ████████  
+ ░███    ░███ ███░░███ ███░░  ░░███  ███░░███░░███░░███ 
+ ░███    ░███░███████ ░░█████  ░███ ░███ ░███ ░███ ░███ 
+ ░███    ███ ░███░░░   ░░░░███ ░███ ░███ ░███ ░███ ░███ 
+ ██████████  ░░██████  ██████  █████░░███████ ████ █████
+░░░░░░░░░░    ░░░░░░  ░░░░░░  ░░░░░  ░░░░░███░░░░ ░░░░░ 
+                                     ███ ░███           
+ Operating System Design Project    ░░██████            
+  Advised by Prof. ZHONG Jinghui     ░░░░░░             
+
+    )" << endl;
+
+    //     cout << R"(
+    //    ____  _____    ____               _
+    //   / __ \/ ___/   / __ \ ___   _____ (_)____ _ ____
+    //  / / / /\__ \   / / / // _ \ / ___// // __ `// __ \
+// / /_/ /___/ /  / /_/ //  __/(__  )/ // /_/ // / / /
+    // \____//____/  /_____/ \___//____//_/ \__, //_/ /_/
+    //                                     /____/
+    //     )" << endl;
+
+    //     cout << R"(
+
+    //  ██████╗ ███████╗    ██████╗ ███████╗███████╗██╗ ██████╗ ███╗   ██╗
+    // ██╔═══██╗██╔════╝    ██╔══██╗██╔════╝██╔════╝██║██╔════╝ ████╗  ██║
+    // ██║   ██║███████╗    ██║  ██║█████╗  ███████╗██║██║  ███╗██╔██╗ ██║
+    // ██║   ██║╚════██║    ██║  ██║██╔══╝  ╚════██║██║██║   ██║██║╚██╗██║
+    // ╚██████╔╝███████║    ██████╔╝███████╗███████║██║╚██████╔╝██║ ╚████║
+    //  ╚═════╝ ╚══════╝    ╚═════╝ ╚══════╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+    //     )" << endl;
+
+    //     cout << R"(
+
+    //  ▄██████▄     ▄████████      ████████▄     ▄████████    ▄████████  ▄█     ▄██████▄  ███▄▄▄▄
+    // ███    ███   ███    ███      ███   ▀███   ███    ███   ███    ███ ███    ███    ███ ███▀▀▀██▄
+    // ███    ███   ███    █▀       ███    ███   ███    █▀    ███    █▀  ███▌   ███    █▀  ███   ███
+    // ███    ███   ███             ███    ███  ▄███▄▄▄       ███        ███▌  ▄███        ███   ███
+    // ███    ███ ▀███████████      ███    ███ ▀▀███▀▀▀     ▀███████████ ███▌ ▀▀███ ████▄  ███   ███
+    // ███    ███          ███      ███    ███   ███    █▄           ███ ███    ███    ███ ███   ███
+    // ███    ███    ▄█    ███      ███   ▄███   ███    ███    ▄█    ███ ███    ███    ███ ███   ███
+    //  ▀██████▀   ▄████████▀       ████████▀    ██████████  ▄████████▀  █▀     ████████▀   ▀█   █▀
+
+    //     )" << endl;
 
     static FileSystem fs;
 
