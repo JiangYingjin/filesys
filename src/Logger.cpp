@@ -5,7 +5,6 @@
 #include <plog/Appenders/RollingFileAppender.h>
 #include <plog/Appenders/ConsoleAppender.h>
 // #include <plog/Formatters/TxtFormatter.h>
-// #include <plog/Formatters/MessageOnlyFormatter.h>
 
 namespace plog
 {

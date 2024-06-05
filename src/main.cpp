@@ -6,8 +6,6 @@
 #include <iomanip>
 #include <regex>
 
-#include <boost/algorithm/string.hpp>
-
 #include <vector>
 #include <map>
 #include <unordered_set>
@@ -19,11 +17,11 @@
 #include <cassert>
 #include <chrono>
 
+#include <boost/algorithm/string.hpp>
 #include "Logger.cpp"
 
-#define dout PLOGD
-
 using namespace std;
+#define dout PLOGD
 
 #define FILESYSTEM_NAME "file.sys"
 #define FILESYSTEM_SIZE (16 * 1024 * 1024) // 16MB
@@ -796,13 +794,17 @@ public:
                 indirect_block_list.push_back(inode.double_indirect_block[i]);
 
                 // 读取二级间接块
-                vector<Dentry> dentry(ADDRESS_PER_BLOCK);
-                _load(dentry.data(), BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
-                for (const auto &entry : dentry)
-                    if (entry.inode_id != -1)
+                vector<short> addresses(ADDRESS_PER_BLOCK, -1);
+                _load(addresses.data(), BLOCK_START + inode.double_indirect_block[i] * BLOCK_SIZE, BLOCK_SIZE);
+                dout << "[获取间接地址块列表] 二级间接块第一级所有地址：" << addresses << endl;
+                for (const auto &address : addresses)
+                    if (address != -1)
                         // 将二级中的第二级数据块加入列表
-                        indirect_block_list.push_back(entry.inode_id);
+                        indirect_block_list.push_back(address);
             }
+
+        dout << "[获取间接地址块列表] 间接地址块列表大小：" << indirect_block_list.size() << endl;
+        dout << "[获取间接地址块列表] 间接地址块列表：" << indirect_block_list << endl;
 
         return indirect_block_list;
     }
@@ -1939,10 +1941,22 @@ public:
             dout << (int)block_bitmap.bitmap[i];
         dout << endl;
 
+        vector<short> block_list;
+        for (int i = 0; i < DATA_BLOCK_NUM; i++)
+            if (block_bitmap.get(i))
+                block_list.push_back(i);
+        dout << "已分配的块列表：" << block_list << endl;
+
         dout << "INode Bitmap:" << endl;
         for (int i = 0; i < INODE_BITMAP_SIZE; i++)
             dout << (int)inode_bitmap.bitmap[i];
         dout << endl;
+
+        vector<short> inode_list;
+        for (int i = 0; i < INODE_NUM; i++)
+            if (inode_bitmap.get(i))
+                inode_list.push_back(i);
+        dout << "已分配的 Inode 列表：" << inode_list << endl;
     }
 
     void _vaildate_bitmap_consistency()
@@ -2021,7 +2035,9 @@ public:
 int main(int argc, char *argv[])
 {
     static plog::RollingFileAppender<plog::PlainFomatter> fileAppender("main.log");
-    plog::init(plog::debug, &fileAppender);
+    static plog::ConsoleAppender<plog::PlainFomatter> consoleAppender;
+    // plog::init(plog::debug, &fileAppender);
+    plog::init(plog::debug, &consoleAppender);
 
     static FileSystem fs;
 
@@ -2031,6 +2047,9 @@ int main(int argc, char *argv[])
     {
         cout << fs.working_dir << " > ";
         getline(cin, user_input);
+
+        // 去除前后空格并分割
+        boost::trim(user_input);
         boost::split(input_vec, user_input, boost::is_space(), boost::token_compress_on);
 
         dout << "用户输入：" << user_input << "，分割结果：" << input_vec << "，长度：" << input_vec.size() << "，为空：" << input_vec.empty() << endl;
