@@ -1,53 +1,3 @@
-/*
-
-写一个类似 ext2 的文件系统
-
-要求：
-1．在内存中分配 16MB 空间作为文件系统的存储空间（应该也可以存储到本地）。该空间被划分为块，块大小为 1KB。假设地址长度为 24 位，请设计虚拟地址（virtual address）结构。设计 inode 应包含哪些信息，要求 inode 应支持 10 个直接块地址（direct block addresses）和一个间接块地址。
-
-2．前几个块可用于存储 i 节点，第一个 i 节点可用于根目录 (/)。 (你可以随意设计结构，只要合理并在报告中解释清楚即可）
-
-3.使用随机字符串填充创建的文件。这意味着您只需指定文件大小（KB）和路径+名称。
-4.您的系统应支持以下命令： a) 带有群组的欢迎信息。
-a)系统启动时的欢迎信息，包括组信息（名称和 ID）。这也是您的 "版权 "要求。
-b)创建文件：createFile 文件名 文件大小
-例如：createFile /dir1/myFile 10 (KB)
-如果 fileSiz > 最大文件大小，则打印出错误信息。
-c)删除文件：deleteFile 文件名
-即：deleteFile /dir1/myFile
-d)创建目录：createDir
-即：createDir /dir1/sub1（应支持嵌套目录）
-e)删除目录：deleteDir
-即：deleteDir /dir1/sub1 （不允许删除当前工作目录）
-f)更改当前工作目录：changeDir
-即：changeDir /dir2
-g)列出当前工作目录下的所有文件和子目录：dir
-您还需要列出至少两个文件属性（如文件大小、创建时间等）。
-h)复制文件：cp
-即：cp file1 file2
-i)显示存储空间的使用情况：sum
-显示 16MB 空间的使用情况。您需要列出已使用和未使用的数据块。
-j)打印文件内容：cat
-在终端上打印出文件内容
-即： cat /dir1/file1
-k)您不需要实现 Login 的功能！
-5.加载和退出：退出程序并释放所有占用的内存，但内存的内容应保存在磁盘上，以便重新加载；
-
-rm      =
-rm -r   =
-touch   =
-mkdir   =
-cd      =
-cp      =
-cat     =
-ls      =
-sum     =
-*/
-
-// #pragma GCC optimize("no-stack-protector")
-// #pragma GCC optimize("stack-protector-all")
-// #pragma GCC optimize("stack-protector-strong")
-
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -72,6 +22,13 @@ sum     =
 #include <unordered_set>
 #include <numeric>
 #include <boost/algorithm/string.hpp>
+
+#include <plog/Log.h>
+#include <plog/Appenders/RollingFileAppender.h>
+#include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Formatters/TxtFormatter.h>
+#include <plog/Formatters/MessageOnlyFormatter.h>
+#include <plog/Init.h>
 
 using namespace std;
 
@@ -306,7 +263,7 @@ class INode
 {
 public:
     short id;                                               // INode 编号，占用 2 Byte
-    char file_type;                                         // 文件类型，占用 1 Byte
+    char file_type;                                         // 文件类型，占用 1 Byte f d
     int file_size;                                          // 文件大小（单位 Byte），占用 4 Byte
     int32_t create_time;                                    // 创建时间，占用 4 Byte
     int32_t modify_time;                                    // 修改时间，占用 4 Byte
@@ -2007,10 +1964,20 @@ public:
 
 int main(int argc, char *argv[])
 {
+
+    // 设置控制台日志记录器，只输出 INFO 以上级别的日志到控制台
+    plog::ColorConsoleAppender<plog::MessageOnlyFormatter> consoleAppender;
+    plog::init(plog::info, &consoleAppender);
+
+    // 设置文件日志记录器，输出 DEBUG 以上级别的日志到指定文件
+    plog::RollingFileAppender<plog::TxtFormatter> fileAppender("main.log", 1024 * 1024, 0);
+    plog::init(plog::debug, &fileAppender);
+
     FileSystem fs;
 
     string user_input;
     vector<string> input_vec;
+
     while (true)
     {
         cout << fs.working_dir << " > ";
@@ -2020,7 +1987,6 @@ int main(int argc, char *argv[])
         // cout << user_input << endl;
         // cout << input_vec << endl;
 
-        // TODO
         if (input_vec.size() > 0)
         {
             // l / ls
@@ -2069,7 +2035,7 @@ int main(int argc, char *argv[])
                         else
                             fs.create_file(input_vec[1], filesize_kb);
                     }
-                    catch (const std::exception &e)
+                    catch (const exception &e)
                     {
                         cout << input_vec[0] << ": invalid filesize" << endl
                              << "Usage: touch [filename] [filesize_kb]" << endl;
@@ -2103,7 +2069,7 @@ int main(int argc, char *argv[])
                         if (input[0] == '-' && boost::algorithm::contains(input, "r"))
                         {
                             recursive = true;
-                            input_vec.erase(std::remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
+                            input_vec.erase(remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
                         }
 
                     for (int i = 1; i < input_vec.size(); i++)
@@ -2125,7 +2091,7 @@ int main(int argc, char *argv[])
                         if (input[0] == '-' && boost::algorithm::contains(input, "r"))
                         {
                             recursive = true;
-                            input_vec.erase(std::remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
+                            input_vec.erase(remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
                         }
 
                     fs.copy(input_vec[1], input_vec[2], recursive);
@@ -2141,122 +2107,17 @@ int main(int argc, char *argv[])
         }
     }
 
-    // // 创建文件测试
-    // fs.create_file("/abc", 600);
-    // fs.create_file("/.abc", 600);
-    // fs.create_file("/root/abc", 600);
-    // fs.create_file("/root/.abc", 600);
-    // fs.list_dir();
-    // fs.sum();
-
-    // fs._copy(7, 0, "root-copy");
-    // fs.cat("root-copy/def/abc");
-    // fs.list_dir("root-copy/def");
-
-    // // // // 创建文件夹简单测试
-    // fs.create_dir("root");
-    // // fs.remove("root", 1);
-    // // fs.list_dir();
-    // fs.create_dir("root/def");
-    // fs.create_file("root/def/abc", 600);
-    // fs.create_dir("root/.def");
-    // // fs.create_dir("root/.def/.ghi");
-    // // fs.create_dir("/def");
-    // // fs.create_dir("/.def");
-    // // // 创建文件 / 文件夹 / 打印文件内容联测
-    // // fs.change_dir("root/.def/.ghi");
-    // fs.create_file("abc", 10);
-    // fs.create_file("abc", 600);
-    // fs.remove("abc");
-    // fs.create_file("abc", 600);
-    // fs.cat("abc");
-    // // fs.cat("/root/.def/.ghi/abc");
-    // fs.list_dir();
-    // fs.sum();
-    // fs.change_dir("/root");
-    // fs.list_dir();
-
-    // // fs._remove(1, -1);
-    // fs._remove(0, 4);
-    // fs.remove("/root", 1);
-    // fs.create_file("large-random", 600);
-    // fs.cat("large-random");
-    // fs.list_dir();
-    // fs.sum();
-
-    // fs.remove("large-random-copy");
-    // fs._copy(5, 0, "large-random-copy");
-    // fs.cat("large-random-copy");
-    // fs.list_dir("u/x");
-
-    // fs.block_cnt(0);
-    // fs.remove("abc");
-
-    // fs.copy("root", "root-copy2",1);
-
-    // fs.list_dir();
-    // fs.sum();
-
-    // string test_str = "123456789";
-    // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
-    // string test_str;
-    // string test_str("\0");
-    // test_str.reserve(10);
-    // cout << &test_str << endl;
-    // cout << &test_str[0] << endl;
-    // cout << test_str.data() << endl;
-    // cout << sizeof(test_str) << " " << test_str.size() << " " << test_str.length() << " " << strlen(test_str.c_str()) << endl;
-
-    // fs.change_dir("/root");
-    // fs.change_dir("/root/.def");
-    // fs.change_dir("/root/.def/.ghi");
-    // fs.change_dir("/root/.def/.ghi/abc");
-    // fs.change_dir("/root/.def/.ghi/xxx");
-    // fs.list_dir();
-    // fs.list_dir("/");
-
-    // 打印文件测试
-    // // fs.create_file("root/def/abc", 600);
-    // fs.list_dir("root/def");
-    // // fs.cat("/abc");
-    // // fs._remove(0, 4);
-    // fs.list_dir();
-    // fs.sum();
-
     // // 创建文件夹数量测试
     // for (int i = 1; i < 8190; i++)
     //     fs.create_dir("/d" + to_string(i));
 
-    // // 路径解析测试
-    // vector<string> _path_test_set = {"abc", ".abc", "/.abc", "./.abc", "./.abc/.def", "../.abc/.def"};
-    // fs.working_dir = "/root";
-    // for (const auto &path : _path_test_set)
-    //     fs._split_path(path);
-    // fs.working_dir = "/";
-    // for (const auto &path : _path_test_set)
-    //     fs._split_path(path);
-
-    // // 单文件最大大小测试
-    // fs.create_file("/abc", 15835);
-    // fs.sum();
-
     // // 小文件数量测试
     // for (int i = 1; i < 8192; i++)
     //     fs.create_file("/f" + to_string(i), 1);
-    // fs.sum();
-
-    // // 新增目录项测试
-    // for (int i = 1; i < 8192; i++)
-    //     fs.create_file("/f" + to_string(i), 1);
-    // fs.sum();
-
-    // // 文件实际占用块数
-    // cout << Util::block_occupation(15890) << endl;
 
     // // 列出目录测试
     // for (int i = 1; i <= 10; i++)
     //     fs.create_file("/f" + to_string(i), 1);
-    // fs.list_dir();
 
     return 0;
 }

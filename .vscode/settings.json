@@ -79,6 +79,10 @@
         "ranges": "cpp",
         "unordered_set": "cpp",
         "list": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "strstream": "cpp",
+        "complex": "cpp",
+        "shared_mutex": "cpp",
+        "typeindex": "cpp"
     }
 }
