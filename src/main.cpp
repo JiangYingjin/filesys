@@ -385,19 +385,6 @@ public:
         return bitmap[pos / 8] & (1 << pos % 8);
     }
 
-    friend ostream &operator<<(ostream &os, const Bitmap &bitmap)
-    {
-        os << "--------------- 位图信息 ---------------" << endl;
-        for (int i = 0; i < bitmap.bitmap.size(); i++)
-        {
-            os << bitset<8>(bitmap.bitmap[i]) << " ";
-            if ((i + 1) % 8 == 0)
-                os << endl;
-        }
-        os << "------------------------------------------" << endl;
-        return os;
-    }
-
     // 复制构造函数
     Bitmap(const Bitmap &bitmap)
     {
