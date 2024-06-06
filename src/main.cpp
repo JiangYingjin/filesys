@@ -17,7 +17,7 @@
 #include <cassert>
 #include <chrono>
 
-#include <boost/algorithm/string.hpp>
+// #include <boost/algorithm/string.hpp>
 #include "Logger.cpp"
 
 using namespace std;
@@ -135,6 +135,25 @@ public:
             return false;
 
         return str.substr(str.length() - suffix.length()) == suffix;
+    }
+
+    static string trim_space(const string &str)
+    {
+        size_t first = str.find_first_not_of(' ');
+        if (string::npos == first)
+            return "";
+        size_t last = str.find_last_not_of(' ');
+        return str.substr(first, (last - first + 1));
+    }
+
+    static vector<string> split_space(const string &str)
+    {
+        vector<string> tokens;
+        istringstream iss(str);
+        string token;
+        while (iss >> token)
+            tokens.push_back(token);
+        return tokens;
     }
 
     static void cout_center(const string str, const int width)
@@ -2077,8 +2096,8 @@ public:
 
 //     // 使用 string_view 来查看输入字符串
 //     string_view inputView(input);
-//     // 使用 ranges::split 来拆分字符串
-//     auto words = inputView | views::split(' ') | views::transform([](auto &&range)
+//     // 使用 ranges::split_space 来拆分字符串
+//     auto words = inputView | views::split_space(' ') | views::transform([](auto &&range)
 //                                                                   { return string(range.begin(), range.end()); });
 
 //     // 输出拆分后的单词
@@ -2169,8 +2188,10 @@ int main(int argc, char *argv[])
         getline(cin, user_input);
 
         // 去除前后空格并分割
-        boost::trim(user_input);
-        boost::split(input_vec, user_input, boost::is_space(), boost::token_compress_on);
+        user_input = Util::trim_space(user_input);
+        input_vec = Util::split_space(user_input);
+        // boost::trim_space(user_input);
+        // boost::split_space(input_vec, user_input, boost::is_space(), boost::token_compress_on);
 
         dout << "用户输入：" << user_input << "，分割结果：" << input_vec << "，长度：" << input_vec.size() << "，为空：" << input_vec.empty() << endl;
 
@@ -2253,7 +2274,7 @@ int main(int argc, char *argv[])
                 {
                     bool recursive = false;
                     for (const auto &input : input_vec)
-                        if (input[0] == '-' && boost::algorithm::contains(input, "r"))
+                        if (input[0] == '-' && input.find("r") != string::npos)
                         {
                             recursive = true;
                             input_vec.erase(remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
@@ -2275,7 +2296,8 @@ int main(int argc, char *argv[])
                 {
                     bool recursive = false;
                     for (const auto &input : input_vec)
-                        if (input[0] == '-' && boost::algorithm::contains(input, "r"))
+                        // if (input[0] == '-' && boost::algorithm::contains(input, "r"))
+                        if (input[0] == '-' && input.find("r") != string::npos)
                         {
                             recursive = true;
                             input_vec.erase(remove(input_vec.begin(), input_vec.end(), input), input_vec.end());
