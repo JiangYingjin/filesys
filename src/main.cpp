@@ -17,8 +17,12 @@
 #include <cassert>
 #include <chrono>
 
+#include <plog/Log.h>
+#include <plog/Init.h>
+#include <plog/Appenders/RollingFileAppender.h>
+#include <plog/Appenders/ConsoleAppender.h>
+
 // #include <boost/algorithm/string.hpp>
-#include "Logger.cpp"
 
 using namespace std;
 #define dout PLOGD
@@ -59,6 +63,15 @@ using namespace std;
 #define NUM_DOUBLE_INDIRECT_BLOCK (1)
 
 #define ROOT_INODE_ID (0)
+
+#define RESET "\e[0m"
+#define BOLD "\e[1m"
+#define RED "\e[31m"
+#define GREEN "\e[32m"
+#define YELLOW "\e[33m"
+#define BLUE "\e[34m"
+#define PURPLE "\e[35m"
+#define CYAN "\e[36m"
 
 // Vector 输出重载
 template <typename T>
@@ -1789,7 +1802,7 @@ public:
 
         if (superblock.available_inode_num < src_inode_cnt)
         {
-            // cout << "[复制文件/目录] 可用 Inode 不足，复制失败！源文件/目录占用 " << src_inode_cnt << " 个 Inode，目前可用 Inode 剩余 " << superblock.available_inode_num << " 个" << endl;
+            dout << "[复制文件/目录] 可用 Inode 不足，复制失败！源文件/目录占用 " << src_inode_cnt << " 个 Inode，目前可用 Inode 剩余 " << superblock.available_inode_num << " 个" << endl;
             cout << "cp: cannot copy '" << absolute_src_path << "': No available inode" << endl;
             return;
         }
@@ -1798,7 +1811,7 @@ public:
 
         if (superblock.available_block_num < src_block_cnt)
         {
-            cout << "[复制文件/目录] 可用块不足，复制失败！源文件/目录占用 " << src_block_cnt << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
+            dout << "[复制文件/目录] 可用块不足，复制失败！源文件/目录占用 " << src_block_cnt << " 个块，目前可用块剩余 " << superblock.available_block_num << " 个" << endl;
             cout << "cp: cannot copy '" << absolute_src_path << "': No available block" << endl;
             return;
         }
@@ -1978,10 +1991,14 @@ public:
                         cout << setw(4) << Util::readable_size(inode.file_size) << "  ";
                         cout << Util::time_to_string(inode.create_time) << " ";
                         cout << Util::time_to_string(inode.modify_time) << "  ";
-                        cout << dentry.get_filename() << endl;
+                        // 文件名
+                        if (inode.file_type == 'd')
+                            cout << BOLD << BLUE << dentry.get_filename() << RESET << endl;
+                        else
+                            cout << dentry.get_filename() << endl;
                     }
                 }
-                cout << "------------------------------------------" << endl;
+                // cout << "------------------------------------------" << endl;
             }
         }
     }
@@ -2075,22 +2092,29 @@ public:
     }
 };
 
-// void _input()
-// {
-//     string input;
-//     cout << "Please enter your input: ";
-//     getline(cin, input);
+namespace plog
+{
+    class PlainFomatter
+    {
+    public:
+        // This method returns a header for a new file. In our case it is empty.
+        static util::nstring header()
+        {
+            return util::nstring();
+        }
 
-//     // 使用 string_view 来查看输入字符串
-//     string_view inputView(input);
-//     // 使用 ranges::split_space 来拆分字符串
-//     auto words = inputView | views::split_space(' ') | views::transform([](auto &&range)
-//                                                                   { return string(range.begin(), range.end()); });
+        // This method returns a string from a record.
+        static util::nstring format(const Record &record)
+        {
+            util::nostringstream ss;
+            ss << record.getMessage();
+            return ss.str();
+        }
+    };
+}
 
-//     // 输出拆分后的单词
-//     for (const auto &word : words)
-//         cout << word << endl;
-// }
+// static plog::ConsoleAppender<plog::MessageOnlyFormatter> consoleAppender;
+// plog::init<Console>(plog::info, &consoleAppender);
 
 int main(int argc, char *argv[])
 {
@@ -2171,7 +2195,7 @@ int main(int argc, char *argv[])
     vector<string> input_vec;
     while (true)
     {
-        cout << fs.working_dir << " > ";
+        cout << BOLD << CYAN << fs.working_dir << GREEN << " > " << RESET;
         getline(cin, user_input);
 
         // 去除前后空格并分割
