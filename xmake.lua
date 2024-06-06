@@ -7,6 +7,9 @@ add_linkdirs("/usr/lib", "/usr/local/lib")
 target("main")
 set_kind("binary")
 add_files("src/*.cpp")
+if is_plat("windows") then
+    add_includedirs("include")
+end
 
 -- set_policy("build.c++.modules", true)
 

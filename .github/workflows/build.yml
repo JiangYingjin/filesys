@@ -1,0 +1,20 @@
+on: [push]
+jobs:
+  # build-linux:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: setup xmake
+  #       uses: xmake-io/github-action-setup-xmake@v1
+  #     # - run: xmake
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 下载依赖
+        run: curl -O https://file.jiangyj.tech/proj/filesys/include.zip
+      - name: 解压依赖
+        run: Expand-Archive -Path include.zip -DestinationPath .
+      - name: setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+      - run: xmake
