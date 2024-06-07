@@ -6,7 +6,8 @@ jobs:
   test:
     runs-on: linux-amd64
     steps:
-      # - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - run: ls -alh
       # - run: echo "test success"
       - run: echo " ${{ gitea.workspace }}"
       - run: echo " ${{ gitea.repository }}"
