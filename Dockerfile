@@ -2,8 +2,8 @@
 FROM ubuntu:latest
 
 # 更新软件包列表并安装编译工具和依赖
-RUN apt update && \
-    apt install -y build-essential
+# RUN apt update && \
+#     apt install -y build-essential
 
 # RUN apt install -y xmake
 

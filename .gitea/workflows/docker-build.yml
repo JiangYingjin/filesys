@@ -1,7 +1,10 @@
-on: push
+on: 
+  - push
+  - workflow_dispatch
+
 jobs:
   test:
     runs-on: linux-amd64
     steps:
-      - uses: actions/checkout@v4
+      # - uses: actions/checkout@v4
       - run: echo "test success"
