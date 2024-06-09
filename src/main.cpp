@@ -2168,7 +2168,7 @@ int main(int argc, char *argv[])
     // 注册 Ctrl+C 信号处理函数
     signal(SIGINT, [](int sig_num)
            {
-        cout << "SIGINT captured. Exiting gracefully." << endl;
+        cout << endl << "SIGINT captured. Exiting gracefully." << endl;
         exit(0); });
 
     while (true)
@@ -2314,16 +2314,56 @@ int main(int argc, char *argv[])
             // erase
             else if (input_vec[0] == "erase")
             {
-                // delete &fs;
+                // 保存原始 cout 缓冲区
+                streambuf *cout_sbuf = cout.rdbuf();
+                // 将 cout 重定向到 /dev/null
+                ofstream devnull("/dev/null");
+                cout.rdbuf(devnull.rdbuf());
+
                 system("rm file.sys");
                 fs = FileSystem();
+
+                // 恢复 cout 到原始缓冲区
+                cout.rdbuf(cout_sbuf);
+                cout << "[Erase] Filesystem erased" << endl;
+            }
+
+            // cmd
+            else if (input_vec[0] == "cmd")
+            {
+                cout << "Available commands:" << endl;
+                cout << "\tl / ls" << endl
+                     << "\t\tList files in current directory" << endl;
+                cout << "\tcd [path]" << endl
+                     << "\t\tChange working directory" << endl;
+                cout << "\tsum" << endl
+                     << "\t\tShow filesystem summary" << endl;
+                cout << "\tcat [filename]" << endl
+                     << "\t\tShow file content" << endl;
+                cout << "\ttouch [filename] [filesize_kb]" << endl
+                     << "\t\tCreate a file" << endl;
+                cout << "\tmkdir [dirname1] [dirname2] ..." << endl
+                     << "\t\tCreate a directory" << endl;
+                cout << "\trm [-r] [filename1] [filename2] ..." << endl
+                     << "\t\tRemove a file or directory" << endl;
+                cout << "\tcp [-r] [src] [dst]" << endl
+                     << "\t\tCopy a file or directory" << endl;
+                cout << "\tsum" << endl
+                     << "\t\tShow filesystem summary" << endl;
+                cout << "\tclear" << endl
+                     << "\t\tClear screen" << endl;
+                cout << "\terase" << endl
+                     << "\t\tErase filesystem" << endl;
+                cout << "\texit" << endl
+                     << "\t\tExit" << endl;
             }
 
             else if (input_vec[0] == "")
                 ;
 
             else
-                cout << "command not found: " << input_vec[0] << endl;
+                cout << "command not found: " << input_vec[0] << endl
+                     << "Type 'cmd' to see all available commands" << endl;
         }
     }
 
