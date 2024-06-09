@@ -1860,6 +1860,40 @@ public:
         dout << "[复制文件/目录] 文件/目录 " << absolute_src_path << " 已成功复制到 " << absolute_dst_path << endl;
     }
 
+    void hard_link(const string &src_path, const string &dst_path)
+    {
+        // 将路径转为绝对路径
+        string absolute_src_path = _absolute_path(src_path);
+        string absolute_dst_path = _absolute_path(dst_path);
+
+        dout << "[硬链接] 准备在 " << absolute_dst_path << " 创建硬链接，指向 " << absolute_src_path << " ..." << endl;
+
+        // 根据路径查找 Inode
+        short src_dir_inode_id, src_file_inode_id;
+        _search_inode(src_path, src_dir_inode_id, src_file_inode_id);
+
+        short dst_dir_inode_id, dst_file_inode_id;
+        _search_inode(dst_path, dst_dir_inode_id, dst_file_inode_id);
+
+        if (src_file_inode_id == -1)
+        {
+            // cout << "[硬链接] 源文件 " << absolute_src_path << " 不存在" << endl;
+            cout << "ln: cannot create link '" << absolute_dst_path << "': No such file or directory" << endl;
+            return;
+        }
+
+        if (dst_file_inode_id != -1)
+        {
+            // cout << "[硬链接] 目标文件 " << absolute_dst_path << " 已存在" << endl;
+            cout << "ln: cannot create link '" << absolute_dst_path << "': File exists" << endl;
+            return;
+        }
+
+        // 创建硬链接（仅新增目录项，不改动 INode 和数据块、地址块）
+        _add_dentry(dst_dir_inode_id, src_file_inode_id, _filename(dst_path));
+        dout << "[硬链接] 硬链接 " << absolute_dst_path << " 已创建" << endl;
+    }
+
     // 读取并打印文件内容
     void cat(const string &path)
     {
@@ -2296,6 +2330,16 @@ int main(int argc, char *argv[])
                 }
             }
 
+            // ln
+            else if (input_vec[0] == "ln")
+            {
+                if (input_vec.size() != 3)
+                    cout << input_vec[0] << ": invalid arguments" << endl
+                         << "Usage: ln [src] [dst]" << endl;
+                else
+                    fs.hard_link(input_vec[1], input_vec[2]);
+            }
+
             // sum
             else if (input_vec[0] == "sum")
                 fs.sum();
@@ -2348,6 +2392,8 @@ int main(int argc, char *argv[])
                      << "\t\tRemove a file or directory" << endl;
                 cout << "\tcp [-r] [src] [dst]" << endl
                      << "\t\tCopy a file or directory" << endl;
+                cout << "\tln [src] [dst]" << endl
+                     << "\t\tCreate a hard link" << endl;
                 cout << "\tsum" << endl
                      << "\t\tShow filesystem summary" << endl;
                 cout << "\tclear" << endl
