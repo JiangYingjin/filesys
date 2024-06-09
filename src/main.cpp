@@ -1339,31 +1339,12 @@ public:
         dout << "[统计块数量] 正在统计 " << inode_id << " 的占用总块数 ..." << endl;
 
         short cnt = 0;
-        const INode inode = _get_inode(inode_id);
-
-        if (inode.file_type != 'd')
+        vector<short> inode_list = _inode_cnt(inode_id);
+        for (const auto &inode_id : inode_list)
         {
-            // 数据块
-            vector<short> block_id_list = _get_block_list(inode);
-            // 间接地址块
-            vector<short> addr_block_id_list = _get_addr_block_list(inode);
-
-            cnt = block_id_list.size() + addr_block_id_list.size();
-        }
-        else if (inode.file_type == 'd')
-        {
-            // 数据块（Dentry 数据块）
-            vector<short> block_id_list = _get_block_list(inode);
-            // 间接地址块
-            vector<short> addr_block_id_list = _get_addr_block_list(inode);
-
-            cnt = block_id_list.size() + addr_block_id_list.size();
-
-            // 该目录下文件/文件夹占用的块数
-            vector<Dentry> dentry_list = _load_dentries(inode);
-            for (const auto &dentry : dentry_list)
-                if (dentry.inode_id != -1 && dentry.get_filename() != "." && dentry.get_filename() != "..")
-                    cnt += block_cnt(dentry.inode_id);
+            const INode inode = _get_inode(inode_id);
+            // 计数加上数据块块数和地址块块数
+            cnt += inode.file_size / BLOCK_SIZE + _get_addr_block_list(inode).size();
         }
 
         dout << "[统计块数量] INode " << inode_id << " 占用总块数：" << cnt << endl;
