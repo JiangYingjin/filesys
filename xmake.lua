@@ -1,15 +1,10 @@
 add_rules("mode.debug", "mode.release")
 
 set_languages("c++20")
-add_includedirs("/usr/include", "/usr/local/include")
-add_linkdirs("/usr/lib", "/usr/local/lib")
 
 target("main")
 set_kind("binary")
 add_files("src/*.cpp")
-if is_plat("windows") then
-    add_includedirs("include")
-end
 
 -- set_policy("build.c++.modules", true)
 
