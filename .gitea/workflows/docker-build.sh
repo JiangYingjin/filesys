@@ -4,4 +4,4 @@ docker build -t filesys .
 datetime=$(date "+%d%H%M")
 docker tag filesys csjiangyj/filesys:$datetime
 docker tag csjiangyj/filesys:$datetime csjiangyj/filesys:latest
-docker push csjiangyj/filesys:latetest
+docker push csjiangyj/filesys:latest
