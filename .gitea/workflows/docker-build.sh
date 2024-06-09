@@ -1,3 +1,4 @@
+cd /root/proj/filesys/current
 docker build -t filesys .
 # 获取当前的日时分秒
 datetime=$(date "+%d%H%M")
