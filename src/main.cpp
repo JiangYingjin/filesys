@@ -1340,7 +1340,8 @@ public:
 
         short cnt = 0;
         vector<short> inode_list = _inode_cnt(inode_id);
-        for (const auto &inode_id : inode_list)
+        unordered_set<short> unique_inode_list(inode_list.begin(), inode_list.end());
+        for (const auto &inode_id : unique_inode_list)
         {
             const INode inode = _get_inode(inode_id);
             // 计数加上数据块块数和地址块块数
