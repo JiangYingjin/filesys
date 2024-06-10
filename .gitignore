@@ -1,5 +1,4 @@
 .xmake
 build
-main
 file.sys
 *log*
