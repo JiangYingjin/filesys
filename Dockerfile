@@ -19,7 +19,7 @@ FROM ubuntu:latest
 
 COPY build/linux/x86_64/release/main .
 
-RUN ln -s ./main /usr/bin/fs
+RUN ln -s /main /usr/bin/fs
 
 # # 设置工作目录
 # WORKDIR /filesys
@@ -29,4 +29,4 @@ RUN ln -s ./main /usr/bin/fs
 
 # # 指定容器启动时执行的命令
 # CMD ["/filesys/build/linux/x86_64/release/main"]
-CMD ["./main"]
+CMD ["/main"]
