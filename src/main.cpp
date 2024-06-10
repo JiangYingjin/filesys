@@ -344,30 +344,40 @@ public:
 
     friend ostream &operator<<(ostream &os, const INode &inode)
     {
-        os << "--------------- INode 信息 ---------------" << endl;
-        os << "INode ID：\t" << inode.id << endl;
-        os << "文件类型：\t" << inode.file_type << endl;
-        os << "文件大小：\t" << inode.file_size << " 字节" << endl;
-        os << "创建时间：\t" << Util::time_to_string(inode.create_time) << endl;
-        os << "修改时间：\t" << Util::time_to_string(inode.modify_time) << endl;
-        os << "硬链接数：\t" << inode.link_cnt << endl;
+        // os << "--------------- INode 信息 ---------------" << endl;
+        // os << "INode ID：\t" << inode.id << endl;
+        // os << "文件类型：\t" << inode.file_type << endl;
+        // os << "文件大小：\t" << inode.file_size << " 字节" << endl;
+        // os << "创建时间：\t" << Util::time_to_string(inode.create_time) << endl;
+        // os << "修改时间：\t" << Util::time_to_string(inode.modify_time) << endl;
+        // os << "硬链接数：\t" << inode.link_cnt << endl;
+        os << "------------------- INode Info -------------------" << endl;
+        os << "INode ID:\t\t" << inode.id << endl;
+        os << "File Type:\t\t" << inode.file_type << endl;
+        os << "File Size:\t\t" << Util::readable_size(inode.file_size) << endl;
+        os << "Create Time:\t\t" << Util::time_to_string(inode.create_time) << endl;
+        os << "Modify Time:\t\t" << Util::time_to_string(inode.modify_time) << endl;
+        os << "Link Count:\t\t" << inode.link_cnt << endl;
 
-        os << "直接块：\t";
+        // os << "直接块：\t";
+        os << "Direct Addr:\t\t";
         for (int i = 0; i < NUM_DIRECT_BLOCK; i++)
             os << inode.direct_block[i] << " ";
         os << endl;
 
-        os << "间接块：\t";
+        // os << "间接块：\t";
+        os << "Indirect Addr:\t\t";
         for (int i = 0; i < NUM_INDIRECT_BLOCK; i++)
             os << inode.indirect_block[i] << " ";
         os << endl;
 
-        os << "二级间接块：\t";
+        // os << "二级间接块：\t";
+        os << "Double Indirect Addr:\t";
         for (int i = 0; i < NUM_DOUBLE_INDIRECT_BLOCK; i++)
             os << inode.double_indirect_block[i] << " ";
         os << endl;
 
-        os << "------------------------------------------" << endl;
+        os << "--------------------------------------------------" << endl;
         return os;
     }
 };
@@ -2020,6 +2030,28 @@ public:
         }
     }
 
+    void stat(const string &path)
+    {
+        // 将路径转为绝对路径
+        string absolute_path = _absolute_path(path);
+
+        // 根据路径查找 Inode
+        short dir_inode_id, file_inode_id;
+        _search_inode(path, dir_inode_id, file_inode_id);
+
+        // 如果 file_inode_id 为 -1，则说明文件不存在
+        if (file_inode_id == -1)
+        {
+            // cout << "[查看文件状态] 文件 " << absolute_path << " 不存在" << endl;
+            cout << "stat: cannot stat '" << absolute_path << "': No such file or directory" << endl;
+            return;
+        }
+
+        // 打印 INode 信息
+        cout << "File: " << absolute_path << endl;
+        cout << _get_inode(file_inode_id);
+    }
+
     void sum()
     {
         cout << superblock;
@@ -2322,6 +2354,16 @@ int main(int argc, char *argv[])
                     fs.hard_link(input_vec[1], input_vec[2]);
             }
 
+            // stat
+            else if (input_vec[0] == "stat")
+            {
+                if (input_vec.size() != 2)
+                    cout << input_vec[0] << ": invalid arguments" << endl
+                         << "Usage: stat [filename]" << endl;
+                else
+                    fs.stat(input_vec[1]);
+            }
+
             // sum
             else if (input_vec[0] == "sum")
                 fs.sum();
@@ -2376,6 +2418,8 @@ int main(int argc, char *argv[])
                      << "\t\tCopy a file or directory" << endl;
                 cout << "\tln [src] [dst]" << endl
                      << "\t\tCreate a hard link" << endl;
+                cout << "\tstat [filename]" << endl
+                     << "\t\tShow file INode info" << endl;
                 cout << "\tsum" << endl
                      << "\t\tShow filesystem summary" << endl;
                 cout << "\tclear" << endl
