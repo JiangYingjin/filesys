@@ -23,8 +23,6 @@
 #include <plog/Appenders/RollingFileAppender.h>
 #include <plog/Appenders/ConsoleAppender.h>
 
-// #include <boost/algorithm/string.hpp>
-
 using namespace std;
 #define dout PLOGD
 
@@ -2004,7 +2002,7 @@ public:
                     if (dentry.inode_id != -1)
                     {
                         INode inode = _get_inode(dentry.inode_id);
-                        cout << setw(4) << inode.id << "  ";
+                        // cout << setw(4) << inode.id << "  ";
                         if (inode.file_type == 'd')
                             // cout << "目录 ";
                             cout << " dir ";
