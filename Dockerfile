@@ -19,6 +19,8 @@ FROM ubuntu:latest
 
 COPY build/linux/x86_64/release/main .
 
+RUN ln -s ./main /usr/bin/fs
+
 # # 设置工作目录
 # WORKDIR /filesys
 
