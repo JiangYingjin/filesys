@@ -2235,11 +2235,11 @@ int main(int argc, char *argv[])
         if (!input_vec.empty())
         {
             // l / ls
-            if (input_vec[0] == "l" || input_vec[0] == "ls")
+            if (input_vec[0] == "l" || input_vec[0] == "ls" || input_vec[0] == "dir")
                 fs.list_dir();
 
             // cd
-            else if (input_vec[0] == "cd")
+            else if (input_vec[0] == "cd" || input_vec[0] == "changeDir")
             {
                 if (input_vec.size() < 2)
                     ;
