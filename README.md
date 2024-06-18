@@ -1,20 +1,27 @@
-# 类 Unix 文件系统
+# Unix-like File System
 
-## 运行
+## Run
 
-推荐使用 Docker 运行！
+> 推荐使用 Docker 运行！
 
 首次启动：
 
-- docker run -it --name fs csjiangyj/filesys
+```bash
+docker run -it --name fs csjiangyj/filesys
+```
 
 退出后重新启动：
 
-- docker start fs && docker exec -it fs fs
+```bash
+docker start fs && docker exec -it fs fs
+```
 
-此外，根目录下放置了适用于 Linux 系统的可执行文件，请确保您的系统具有较新的 C++ 共享库。
+## Features
 
-## 要求
+- 支持双重间接地址
+- 支持硬链接
+
+## Requirement
 
 1. 在内存中分配 16MB 空间作为文件系统的存储空间（应该也可以存储到本地）。该空间被划分为块，块大小为 1KB。假设地址长度为 24 位，请设计虚拟地址（virtual address）结构。设计 inode 应包含哪些信息，要求 inode 应支持 10 个直接块地址（direct block addresses）和一个间接块地址。
 
