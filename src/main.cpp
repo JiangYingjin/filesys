@@ -116,7 +116,7 @@ public:
         short num_2nd_indirect_block = ceil(float(filesize_kb - NUM_DIRECT_BLOCK * BLOCK_SIZE / 1024 - NUM_INDIRECT_BLOCK * ADDRESS_PER_BLOCK * BLOCK_SIZE / 1024) / (ADDRESS_PER_BLOCK * BLOCK_SIZE / 1024));
         if (num_2nd_indirect_block < 0)
             num_2nd_indirect_block = 0;
-        cout << "filesize_kb: " << filesize_kb << " num_indirect_block: " << num_indirect_block << " num_double_indirect_block: " << num_double_indirect_block << " num_2nd_indirect_block: " << num_2nd_indirect_block << endl;
+        dout << "filesize_kb: " << filesize_kb << " num_indirect_block: " << num_indirect_block << " num_double_indirect_block: " << num_double_indirect_block << " num_2nd_indirect_block: " << num_2nd_indirect_block << endl;
         return filesize_kb + num_indirect_block + num_double_indirect_block + num_2nd_indirect_block;
     }
 
