@@ -2174,7 +2174,7 @@ int main(int argc, char *argv[])
     if (term_val == nullptr)
     {
         cout << "Docker non-interactive mode detected. Please run with -it option." << endl;
-        return 1;
+        return 0;
     }
 
     if (argc > 1)
