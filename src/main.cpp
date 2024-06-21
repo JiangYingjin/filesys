@@ -2169,6 +2169,13 @@ int main(int argc, char *argv[])
 {
     system("clear");
 
+    // 处理 Docker 非 -it 模式下的关闭标准输入问题
+    if (!isatty(fileno(stdin)))
+    {
+        cout << "Error: stdin is not a terminal." << endl;
+        return 1;
+    }
+
     if (argc > 1)
     {
         string param = string(argv[1]);
