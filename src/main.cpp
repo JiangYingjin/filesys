@@ -18,6 +18,10 @@
 #include <chrono>
 #include <csignal>
 
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
 #include <plog/Log.h>
 #include <plog/Init.h>
 #include <plog/Appenders/RollingFileAppender.h>
@@ -2169,14 +2173,6 @@ int main(int argc, char *argv[])
 {
     system("clear");
 
-    // 处理 Docker 非 -it 模式下的关闭标准输入问题
-    char *term_val = getenv("TERM");
-    if (term_val == nullptr)
-    {
-        cout << "Docker non-interactive mode detected. Please run with -it option." << endl;
-        return 0;
-    }
-
     if (argc > 1)
     {
         string param = string(argv[1]);
@@ -2226,6 +2222,19 @@ int main(int argc, char *argv[])
            {
         cout << endl << "SIGINT captured. Exiting gracefully." << endl;
         exit(0); });
+
+    // 处理 Docker 非 -it 模式下的关闭标准输入问题
+    char *term_val = getenv("TERM");
+    if (term_val == nullptr)
+    {
+        cout << "Docker non-interactive mode detected. Please run with -it option." << endl;
+        // 无限等待
+        std::mutex mtx;
+        std::condition_variable cv;
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock);
+        return 0;
+    }
 
     while (true)
     {
