@@ -2169,18 +2169,11 @@ int main(int argc, char *argv[])
 {
     system("clear");
 
-    // // 处理 Docker 非 -it 模式下的关闭标准输入问题
-    // if (!isatty(fileno(stdin)))
-    // {
-    //     cout << "Error: stdin is not a terminal." << endl;
-    //     return 1;
-    // }
-
-    string term_val = getenv("TERM");
-    if (term_val.empty())
+    // 处理 Docker 非 -it 模式下的关闭标准输入问题
+    char *term_val = getenv("TERM");
+    if (term_val == nullptr)
     {
-        cout << "Error: TERM environment variable is not set." << endl;
-        cout << "Docker non-interactive mode detected. Exiting gracefully." << endl;
+        cout << "Docker non-interactive mode detected. Please run with -it option." << endl;
         return 1;
     }
 
