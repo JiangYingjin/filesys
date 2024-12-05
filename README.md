@@ -16,11 +16,6 @@ docker run -it --name fs csjiangyj/filesys
 docker start fs && docker exec -it fs fs
 ```
 
-## Features
-
-- 支持二级间接地址
-- 支持硬链接
-
 ## Requirement
 
 1. 在内存中分配 16MB 空间作为文件系统的存储空间（应该也可以存储到本地）。该空间被划分为块，块大小为 1KB。假设地址长度为 24 位，请设计虚拟地址（virtual address）结构。设计 inode 应包含哪些信息，要求 inode 应支持 10 个直接块地址（direct block addresses）和一个间接块地址。
@@ -51,3 +46,29 @@ docker start fs && docker exec -it fs fs
    10. 打印文件内容：cat
        - 在终端上打印出文件内容，即： cat /dir1/file1
    11. 加载和退出：退出程序并释放所有占用的内存，但内存的内容应保存在磁盘上，以便重新加载。
+
+> 在作业要求基础上额外支持二级间接地址、硬链接等。
+
+## Demo
+
+![](demo/GIF-00.gif)
+![](demo/GIF-01.gif)
+![](demo/GIF-02.gif)
+![](demo/GIF-03.gif)
+![](demo/GIF-04.gif)
+![](demo/GIF-05.gif)
+![](demo/GIF-06.gif)
+![](demo/GIF-07.gif)
+
+![](demo/Screenshot-00.jpg)
+![](demo/Screenshot-01.jpg)
+![](demo/Screenshot-02.jpg)
+![](demo/Screenshot-03.jpg)
+![](demo/Screenshot-04.jpg)
+![](demo/Screenshot-05.jpg)
+![](demo/Screenshot-06.jpg)
+![](demo/Screenshot-07.jpg)
+![](demo/Screenshot-08.jpg)
+![](demo/Screenshot-09.jpg)
+![](demo/Screenshot-10.jpg)
+![](demo/Screenshot-11.jpg)
