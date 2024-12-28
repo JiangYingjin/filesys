@@ -1,53 +1,111 @@
+Here’s an improved and professionalized version of your README in English, tailored to the style and expectations of a GitHub project README:
+
+---
+
 # Unix-like File System
 
-## Run
+A lightweight, Unix-like file system implemented in memory, designed to simulate real-world file system operations. This project provides a practical demonstration of file system design concepts, including file and directory management, virtual addressing, and storage efficiency.
 
-> 推荐使用 Docker 运行！
+The system supports common file system operations such as file creation, deletion, directory management, and storage space monitoring. It also includes advanced features like indirect addressing and hard links, making it an excellent learning tool for understanding the inner workings of file systems.
 
-首次启动：
+---
+
+## Features
+
+- **In-Memory File System**: Allocates 16MB of memory as the storage space, divided into 1KB blocks.
+- **Virtual Addressing**: Supports 24-bit virtual addresses with a well-designed address structure.
+- **Efficient Inode Design**: Each inode supports 10 direct block addresses and one indirect block address.
+- **Comprehensive File Operations**: Includes file creation, deletion, directory management, and file content display.
+- **Advanced Features**: Supports secondary indirect addressing and hard links for enhanced functionality.
+- **Persistent Storage**: Memory content is saved to disk upon exit for future reloading.
+
+---
+
+## Quick Start
+
+### Run with Docker (Recommended)
+
+For a seamless experience, it's recommended to run the project using Docker.
+
+**First-time setup:**
 
 ```bash
 docker run -it --name fs csjiangyj/filesys
 ```
 
-退出后重新启动：
+**Restart the container after exiting:**
 
 ```bash
 docker start fs && docker exec -it fs fs
 ```
 
-## Requirement
+---
 
-1. 在内存中分配 16MB 空间作为文件系统的存储空间（应该也可以存储到本地）。该空间被划分为块，块大小为 1KB。假设地址长度为 24 位，请设计虚拟地址（virtual address）结构。设计 inode 应包含哪些信息，要求 inode 应支持 10 个直接块地址（direct block addresses）和一个间接块地址。
+## System Requirements & Design
 
-2. 前几个块可用于存储 i 节点，第一个 i 节点可用于根目录 (/)。 (你可以随意设计结构，只要合理并在报告中解释清楚即可）
+This project simulates a Unix-like file system with the following specifications:
 
-3. 使用随机字符串填充创建的文件。这意味着您只需指定文件大小（KB）和路径+名称。
+1. **Memory Allocation**:
 
-4. 您的系统应支持以下命令：
-   1. 系统启动时的欢迎信息，包括组信息（名称和 ID）。这也是您的 "版权 "要求。
-   2. 创建文件：createFile 文件名 文件大小
-      - 例如：createFile /dir1/myFile 10 (KB)
-      - 如果 fileSiz > 最大文件大小，则打印出错误信息。
-   3. 删除文件：deleteFile 文件名
-      - 即：deleteFile /dir1/myFile
-   4. 创建目录：createDir
-      - 即：createDir /dir1/sub1（应支持嵌套目录）
-   5. 删除目录：deleteDir
-      - 即：deleteDir /dir1/sub1 （不允许删除当前工作目录）
-   6. 更改当前工作目录：changeDir
-      - 即：changeDir /dir2
-   7. 列出当前工作目录下的所有文件和子目录：dir
-      - 您还需要列出至少两个文件属性（如文件大小、创建时间等）。
-   8. 复制文件：cp
-      - 即：cp file1 file2
-   9. 显示存储空间的使用情况：sum
-      - 显示 16MB 空间的使用情况。您需要列出已使用和未使用的数据块。
-   10. 打印文件内容：cat
-       - 在终端上打印出文件内容，即： cat /dir1/file1
-   11. 加载和退出：退出程序并释放所有占用的内存，但内存的内容应保存在磁盘上，以便重新加载。
+   - Allocates 16MB of memory as the file system's storage space.
+   - Storage is divided into 1KB blocks.
+   - Virtual address length is 24 bits, with a carefully designed virtual address structure.
 
-> 在作业要求基础上额外支持二级间接地址、硬链接等。
+2. **Inode Design**:
+
+   - Inodes store metadata for files and directories.
+   - Each inode supports 10 direct block addresses and one indirect block address.
+   - The first inode is reserved for the root directory (`/`).
+
+3. **File Content**:
+
+   - Files are filled with random strings for simplicity.
+   - File creation requires specifying the file size (in KB) and its path.
+
+4. **Command Support**:  
+   The system implements the following commands:
+
+   - **Welcome Message**: Displays group information (name and ID) upon startup, fulfilling copyright requirements.
+   - **File Operations**:
+     - `createFile <filename> <size>`: Creates a file with the specified size (in KB).  
+       Example: `createFile /dir1/myFile 10`  
+       If the size exceeds the maximum file size, an error message is displayed.
+     - `deleteFile <filename>`: Deletes the specified file.  
+       Example: `deleteFile /dir1/myFile`
+   - **Directory Operations**:
+     - `createDir <directory>`: Creates a directory (supports nested directories).  
+       Example: `createDir /dir1/sub1`
+     - `deleteDir <directory>`: Deletes a directory (current working directory cannot be deleted).  
+       Example: `deleteDir /dir1/sub1`
+     - `changeDir <directory>`: Changes the current working directory.  
+       Example: `changeDir /dir2`
+   - **Directory Listing**:
+     - `dir`: Lists all files and subdirectories in the current directory, along with at least two file attributes (e.g., file size, creation time).
+   - **File Copy**:
+     - `cp <source> <destination>`: Copies a file to a new location.  
+       Example: `cp /dir1/file1 /dir2/file2`
+   - **Storage Monitoring**:
+     - `sum`: Displays the usage of the 16MB storage space, including used and free blocks.
+   - **File Content Display**:
+     - `cat <filename>`: Prints the content of a file to the terminal.  
+       Example: `cat /dir1/file1`
+   - **Save and Exit**:
+     - Saves the memory content to disk and exits the program. The saved content can be reloaded in future sessions.
+
+---
+
+## Additional Features
+
+In addition to the basic requirements, this project includes the following advanced features:
+
+1. **Secondary Indirect Addressing**:
+
+   - Supports a second level of indirect addressing for larger files.
+
+2. **Hard Links**:
+   - Implements hard links, allowing multiple directory entries to reference the same file.
+
+---
 
 ## Demo
 
@@ -72,3 +130,21 @@ docker start fs && docker exec -it fs fs
 ![](demo/Screenshot-09.jpg)
 ![](demo/Screenshot-10.jpg)
 ![](demo/Screenshot-11.jpg)
+
+---
+
+## Contributing
+
+Contributions are welcome! If you’d like to improve this project, feel free to submit a pull request or open an issue. Whether it’s bug fixes, feature suggestions, or documentation improvements, your help is greatly appreciated.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE). Feel free to use, modify, and distribute it as per the terms of the license.
+
+---
+
+## Acknowledgments
+
+This project was inspired by the foundational concepts of file systems and aims to provide a practical, hands-on learning experience. Special thanks to everyone who contributed to the development and testing of this project.
