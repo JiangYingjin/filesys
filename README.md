@@ -1,7 +1,3 @@
-Here’s an improved and professionalized version of your README in English, tailored to the style and expectations of a GitHub project README:
-
----
-
 # Unix-like File System
 
 A lightweight, Unix-like file system implemented in memory, designed to simulate real-world file system operations. This project provides a practical demonstration of file system design concepts, including file and directory management, virtual addressing, and storage efficiency.
